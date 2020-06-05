@@ -1,0 +1,8 @@
+-Locate a machine that has Microsoft Office installed, and not connected to the network via wifi
+-Unzip contents to directory like c:\scripts
+-Open a powershell prompt, change working directory to c:\scripts
+-To run the script type: .\pre_migration_master.ps1 -startDirectory "c:\test" where c:\test is the directory you want to scan
+-Note: the start directory must be an actual directory, not the fileshare server itself
+-During the second half of the process the script will test Office documents and may freeze up. It is important to log in from time to time and check to see if there are any instances of word/excel/powerpoint open. If so, close them down. 
+-Once complete, the script will generate a crawl log and a report log csv files. Additional reports can be ran from FileToOneDrive.db so don't delete it!
+-The script can be run once the prior scan is complete with a different directory, and will generate additional reports
