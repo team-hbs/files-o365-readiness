@@ -15,9 +15,10 @@ Install-Module PSSQLite
 Import-Module PSSQLite
 #Get-Command -Module PSSQLite
 
-$global:DataSource = '.\FileToOneDrive.db'
+$global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 
-. .\crawl_v10.ps1
+$crawlPath = $PSScriptRoot + "\crawl_v10.ps1"
+. $crawlPath
 #. .\office_cleanup.ps1
 
 function GetUsers($batchNumber)
@@ -74,10 +75,11 @@ function InitPreMigrationMaster($directory)
 		$ownerId = $row.Id
 		
 		#write-host "OwnerId:" $ownerId -ForegroundColor Yellow
-		$email = "jbaldwin@hbs.net"
+		#$email = "jbaldwin@hbs.net"
 		ClearCrawlData $ownerId
 		$timestamp =  get-date -f _MM_dd_HH_mm_ss
-		$logFile = ".\crawl_" + $timestamp + "$ownerId.csv"
+		$logFile = $PSScriptRoot + "\crawl_" + $timestamp + "$ownerId.csv"
+		#InitCrawl  $ownerId $email $path $false |  select-object FileName,Message,ParentFolderCurrent, Query  | Export-Csv $logFile
 		InitCrawl  $ownerId $email $path $false |  select-object FileName,Message,ParentFolderCurrent, Query  | Export-Csv $logFile
 	}
 }
@@ -113,7 +115,7 @@ function OfficeConversionTest()
 		#write-host "OwnerId:" $ownerId -ForegroundColor Yellow
 
 		$timestamp =  get-date -f _MM_dd_HH_mm_ss
-		$logFile = ".\crawl_" + $timestamp + "$ownerId.csv"
+		$logFile = $PSScriptRoot + "\crawl_" + $timestamp + "$ownerId.csv"
 		$result = $null
 		$convertMessage = ""
 		$file = Get-ChildItem -LiteralPath $path -File -ErrorAction Stop
@@ -157,7 +159,7 @@ function GeneratePostScanReport ($directory)
 	write-host "running query"
 	#write-host $users
 	$timestamp =  get-date -f _MM_dd_HH_mm_ss
-	$logFile = ".\report_" + $timestamp + "$ownerId.csv"
+	$logFile = $PSScriptRoot + "\report_" + $timestamp + "$ownerId.csv"
 	$report  | Export-Csv $logFile
 	
 
@@ -169,13 +171,13 @@ function GeneratePostScanReport ($directory)
 	$report = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	write-host "running query"
 	$timestamp =  get-date -f _MM_dd_HH_mm_ss
-	$logFile = ".\msft_errors_" + $timestamp + "$ownerId.csv"
+	$logFile = $PSScriptRoot + "\msft_errors_" + $timestamp + "$ownerId.csv"
 	$report  | Export-Csv $logFile
 }
 
 CreateNewDirectoryEntry $startDirectory
 InitPreMigrationMaster $startDirectory
-Read-Host -Prompt "Enter to Generate Post Scan Report"
+# Read-Host -Prompt "Enter to Generate Post Scan Report"
 GeneratePostScanReport $startDirectory
 
-#usage run as admin --> .\pre_migration_master.ps1 -startDirectory "c:\test"
+# OLD!! usage run as admin --> .\pre_migration_master.ps1 -startDirectory "c:\test"

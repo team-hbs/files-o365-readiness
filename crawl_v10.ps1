@@ -1,9 +1,10 @@
 
 
 $global:unixEpoch = Get-Date -Date "01/01/1970"
-$global:DataSource = ".\FileToOneDrive.db"
+$global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 
-function InitCrawl($ownerId, $email, $startPath, $doConvert)
+#function InitCrawl($ownerId, $email, $startPath, $doConvert)
+function InitCrawl($ownerId, $startPath, $doConvert)
 {
 	$global:word = $null
 	$global:excel = $null
@@ -26,7 +27,7 @@ function InitCrawl($ownerId, $email, $startPath, $doConvert)
     $global:currentFileSize = 0
     $global:currentErrorCount = 0
 
-    write-host $email -ForegroundColor blue
+    #write-host $email -ForegroundColor blue
 
     $StartPath = $path
     $ownerId = $ownerId
@@ -36,7 +37,8 @@ function InitCrawl($ownerId, $email, $startPath, $doConvert)
     
     CrawlFolder $StartPath $ownerId
 	
-    InsertUserEntry $email $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
+    #InsertUserEntry $email $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
+    InsertUserEntry $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
     UpdateExtensions $ownerId
     UpdateFileTotals $ownerId
     UpdateOfficeErrorTotals $ownerId
@@ -109,14 +111,16 @@ function CrawlFolder($path, $ownerId, $currentDepth)
     }
 }
 
-function InsertUserEntry($email, $ownerId, $fileCount, $fileSize, $errorCount)
+#function InsertUserEntry($email, $ownerId, $fileCount, $fileSize, $errorCount)
+function InsertUserEntry($ownerId, $fileCount, $fileSize, $errorCount)
 {
     $query = ''
     try
     {
 		$today = Get-Date
 		$created = [int] (New-TimeSpan -Start $unixEpoch -End $today).TotalSeconds
-	    $query = "Insert INTO  $filesUsersTableName  (Email, OwnerId,FileCountDisk,FileSizeDisk,ErrorCount,CreatedDate) Values('$email', $ownerId,$fileCount,$fileSize,$errorCount,$created)"
+        #$query = "Insert INTO  $filesUsersTableName  (Email, OwnerId,FileCountDisk,FileSizeDisk,ErrorCount,CreatedDate) Values('$email', $ownerId,$fileCount,$fileSize,$errorCount,$created)"
+        $query = "Insert INTO  $filesUsersTableName  (OwnerId,FileCountDisk,FileSizeDisk,ErrorCount,CreatedDate) Values($ownerId,$fileCount,$fileSize,$errorCount,$created)"
         #write-host "Query:" $query -ForegroundColor Green 	   
 	    Invoke-SqliteQuery -Query $Query -DataSource $global:DataSource
     }
