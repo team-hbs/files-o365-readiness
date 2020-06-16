@@ -23,11 +23,6 @@ function InitCrawl($ownerId, $startPath, $doConvert)
 		$filesTableName = "Files_OneDrive"
 	}
 
-	$global:currentFileCount = 0
-    $global:currentFileSize = 0
-    $global:currentErrorCount = 0
-
-    #write-host $email -ForegroundColor blue
 
     $StartPath = $path
     $ownerId = $ownerId
@@ -37,7 +32,6 @@ function InitCrawl($ownerId, $startPath, $doConvert)
     
     CrawlFolder $StartPath $ownerId
 	
-    #InsertUserEntry $email $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
     InsertUserEntry $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
     UpdateExtensions $ownerId
     UpdateFileTotals $ownerId
