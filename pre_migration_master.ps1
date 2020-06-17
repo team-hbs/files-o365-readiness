@@ -187,7 +187,7 @@ function GeneratePostScanReport ($directory)
 	$report | Export-Excel $logFile -WorksheetName "Report" -Title "Report"	-TitleSize 18 -TitleBold -AutoSize -MaxAutoSizeRows 2
 	
 	$excel = Open-ExcelPackage -Path $logFile
-	$sheet = $excel.Workbook.Worksheets[1]
+	$sheet = $excel.Workbook.Worksheets["Report"]
 	Set-ExcelRange -Range $sheet.Cells["H2:H2"] -Value "FileSizeDisk (GB)" -AutoSize
 	Set-ExcelRange -Range $sheet.Cells["I2:I2"] -Value "FileSizeCrawl (GB)" -AutoSize
 	Set-Column -Worksheet $sheet -Column 1 -Width 3
@@ -225,20 +225,21 @@ function GeneratePostScanReport ($directory)
 	$report = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	Write-Host "running query"
 
-	$errors = $report | Group-Object -Property Error | Sort-Object -Property Count -Descending | Select-Object Count, Name
-	$chartDef = New-ExcelChart -Title "Top 5 Errors" -ChartType ColumnClustered -XRange "Name" -YRange "Count" -Width 750 -YAxisTitleText "Count" `
-				-NoLegend -Row 7 -Column 1
-	$errors | Select-Object -First 5 | Export-Excel $logFile -WorksheetName "Error Report Overview" -Title "Error Report Overview" -TitleSize 18 `
-		-TitleBold -ExcelChartDefinition $chartDef -AutoSize -AutoNameRange
-	$errors | Export-Excel $logFile -WorksheetName "Full Errors Count" -Title "Full Errors List" -TitleSize 18 -TitleBold -AutoFilter
-	$report | Export-Excel $logFile -WorksheetName "All Errors" -Title "Errors" -TitleSize 18 -TitleBold -AutoFilter -AutoSize -MaxAutoSizeRows 2
+	if ($report.Count -gt 0) {
+		$errors = $report | Group-Object -Property Error | Sort-Object -Property Count -Descending | Select-Object Count, Name
+		$errors | Export-Excel $logFile -WorksheetName "Error Report" -Title "Error Report" -TitleSize 18 -TitleBold -AutoFilter
+		$report | Export-Excel $logFile -WorksheetName "All Errors" -Title "Errors" -TitleSize 18 -TitleBold -AutoFilter -AutoSize -MaxAutoSizeRows 2
 
-	<#
-	$excel = Open-ExcelPackage -Path $logFile
-	$sheet = $excel.Workbook.Worksheets[3]
-	Add-ExcelChart -Worksheet $sheet -ChartType ColumnClustered -XRange "B3:B7" -YRange "A3:A7" -Width 750 -NoLegend -Column 3 -Row 2
-	Close-ExcelPackage $excel
-	#>
+		
+		$excel = Open-ExcelPackage -Path $logFile
+		$sheet = $excel.Workbook.Worksheets["Error Report"]
+		Set-Column -Worksheet $sheet -Column 2 -Width 65
+		Set-Column -Worksheet $sheet -Column 3 -Value " "
+		Add-ExcelChart -Worksheet $sheet -ChartType ColumnClustered -Title "Top 5 Errors" -XRange "B3:B7" -YRange "A3:A7" -Width 650 -YAxisTitleText "Count" -NoLegend -Column 3 -Row 2
+		Close-ExcelPackage $excel
+	} else {
+		"NO ERRORS" | Export-Excel $logFile -WorksheetName "Error Report" -Title "Error Report" -TitleSize 18 -TitleBold
+	}
 	
 	<#
 	#No Access Report
@@ -246,8 +247,6 @@ function GeneratePostScanReport ($directory)
 	$report | Where-Object {$_.Error -eq "No Access"} | Group-Object -Property ParentFolder | Sort-Object -Propert Count -Descending | Select-Object Count, Name | 
 		Export-Excel $logFile -WorksheetName "No Access" -Title "No Access" -TitleSize 18 -TitleBold
 	#>
-
-	Write-Host "OwnerID:   $ownerId"
 
 }
 
