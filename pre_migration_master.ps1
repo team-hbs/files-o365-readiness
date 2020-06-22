@@ -1,15 +1,16 @@
-﻿<#
-param (
-		        [string] $startDirectory = ""
-      )
-#>
+﻿param (
+	[string]$startDirectory,
+	[string]$directoryList,
+	[switch]$generateReports
+)
 
 # Display window to browse for folder
-Add-Type -AssemblyName System.Windows.Forms
-$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-$FileBrowser.ShowDialog()
-$startDirectory = $FileBrowser.SelectedPath
-
+if (($startDirectory -eq "") -and ($directoryList -eq "")) {
+	Add-Type -AssemblyName System.Windows.Forms
+	$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+	$FileBrowser.ShowDialog()
+	$startDirectory = $FileBrowser.SelectedPath
+}
 
 Install-Module PSSQLite
 Import-Module PSSQLite
@@ -56,16 +57,17 @@ function GetOldOfficeDocuments($directory)
 
 function GetNewBatch($directory)
 {
-	$users = $null
+	$user = $null
 	Write-Host $batchNumber
-	$query = "	SELECT Files_Batch_Users.ADhomeDirectory, Files_Batch_Users.Id 
-				FROM Files_Batch_Users 
-				WHERE Files_Batch_Users.ADhomeDirectory = '$directory'"
+	$query = "	SELECT *
+				FROM Files_Batch_Users
+				ORDER BY Id Desc
+				LIMIT 1"
 	Write-Host "Query:" $query -ForegroundColor Green
-	$users = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+	$user = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	Write-Host "running query"
 	#Write-Host $users
-	return $users
+	return $user
 }
 
 function CreateNewDirectoryEntry($directory)
@@ -79,18 +81,18 @@ function CreateNewDirectoryEntry($directory)
 function InitPreMigrationMaster($directory)
 {
     #$users = GetUsers $batchNumber
-	$users = GetNewBatch $directory
-	foreach($row in $users)
-	{
-		Write-Host $row -ForegroundColor Cyan
-		$path = $row.ADhomedirectory
-		$ownerId = $row.Id
-		
-		#Write-Host "OwnerId:" $ownerId -ForegroundColor Yellow
-		ClearCrawlData $ownerId
-		$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
-		$logFile = $PSScriptRoot + "\crawl_" + $timestamp + "$ownerId.csv"
-		InitCrawl  $ownerId $path $false |  Select-Object FileName,Message,ParentFolderCurrent, Query  | Export-Csv $logFile
+	$user = GetNewBatch $directory
+	Write-Host $user -ForegroundColor Cyan
+	$path = $user.ADhomedirectory
+	$ownerId = $user.Id
+	
+	#Write-Host "OwnerId:" $ownerId -ForegroundColor Yellow
+	ClearCrawlData $ownerId
+	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
+	$logFile = $PSScriptRoot + "\crawl_" + $timestamp + "$ownerId.csv"
+	$errors = InitCrawl $ownerId $path $false |  Select-Object FileName,Message,ParentFolderCurrent, Query
+	if ($global:currentErrorCount -gt 0) {
+		$errors | Export-Csv $logFile
 	}
 }
 
@@ -250,9 +252,28 @@ function GeneratePostScanReport ($directory)
 
 }
 
-CreateNewDirectoryEntry $startDirectory
-InitPreMigrationMaster $startDirectory
-GeneratePostScanReport $startDirectory
+if ($directoryList -eq "") {
+	Write-Host "startDirectory:  $startDirectory"
+
+	CreateNewDirectoryEntry $startDirectory
+	InitPreMigrationMaster $startDirectory
+	if ($generateReports) {
+		GeneratePostScanReport $startDirectory
+	}
+} else {
+	$rows = Import-Csv $directoryList
+	foreach ($row in $rows) {
+		Write-Host "startDirectory:  $directory"
+		$directory = $row.HomeDirectory
+		CreateNewDirectoryEntry $directory
+		InitPreMigrationMaster $directory
+		if ($generateReports) {
+			GeneratePostScanReport $directory
+		}
+	}
+}
+
+
 Pause
 
-# OLD!! usage run as admin --> .\pre_migration_master.ps1 -startDirectory "c:\test"
+# usage run as admin --> .\pre_migration_master.ps1 -startDirectory "c:\test"
