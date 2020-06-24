@@ -1,15 +1,15 @@
 ﻿param (
-	[string]$startDirectory,
-	[string]$directoryList,
-	[switch]$generateReports
+	[string]$mode,
+	[string]$source,
+	[string]$report
 )
 
 # Display window to browse for folder
-if (($startDirectory -eq "") -and ($directoryList -eq "")) {
+if (($mode -eq "single") -and ($source -eq "")) {
 	Add-Type -AssemblyName System.Windows.Forms
 	$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
 	$FileBrowser.ShowDialog()
-	$startDirectory = $FileBrowser.SelectedPath
+	$source = $FileBrowser.SelectedPath
 }
 
 Install-Module PSSQLite
@@ -27,8 +27,7 @@ $crawlPath = $PSScriptRoot + "\crawl_v10.ps1"
 . $crawlPath
 #. .\office_cleanup.ps1
 
-function GetUsers($batchNumber)
-{
+function GetUsers($batchNumber) {
 	$users = $null
 	Write-Host $batchNumber
 	$query = "	SELECT Files_Batch_Users.ADhomeDirectory, Files_Batch_Users.Id 
@@ -55,8 +54,7 @@ function GetOldOfficeDocuments($directory)
 	return $documents
 }
 
-function GetNewBatch($directory)
-{
+function GetNewBatch($directory) {
 	$user = $null
 	Write-Host $batchNumber
 	$query = "	SELECT *
@@ -70,16 +68,14 @@ function GetNewBatch($directory)
 	return $user
 }
 
-function CreateNewDirectoryEntry($directory)
-{
+function CreateNewDirectoryEntry($directory) {
  
 	$query = "Insert INTO Files_Batch_Users (SamAccountName, ADhomeDirectory,BatchNumber) VALUES ('jbaldwin', '$directory', 0)"
     #Write-Host "Query:" $query -ForegroundColor Green 	   
 	Invoke-SqliteQuery -Query $Query -DataSource $global:DataSource
 }
 
-function InitPreMigrationMaster($directory)
-{
+function InitPreMigrationMaster($directory) {
     #$users = GetUsers $batchNumber
 	$user = GetNewBatch $directory
 	Write-Host $user -ForegroundColor Cyan
@@ -96,8 +92,7 @@ function InitPreMigrationMaster($directory)
 	}
 }
 
-function ClearCrawlData($ownerId)
-{
+function ClearCrawlData($ownerId) {
     try
     {
 		$query = "DELETE FROM Files_Users WHERE OwnerId = '$ownerId'"
@@ -113,8 +108,7 @@ function ClearCrawlData($ownerId)
 	}
 }
 
-function OfficeConversionTest()
-{
+function OfficeConversionTest() {
 	#get all old office documents
 	$documents = GetOldOfficeDocuments $directory
 	foreach($row in $documents)
@@ -160,41 +154,38 @@ function OfficeConversionTest()
 
 }
 
-function GeneratePostScanReport ($directory)
-{
-	Write-Host $global:DataSource
-	$users = $null
-	$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
-					FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
-				FROM Files_Batch_Users,Files_Users 
-				WHERE Files_Batch_Users.Id = Files_Users.OwnerId AND ADHomeDirectory = '$directory'"
-	Write-Host "Query:" $query -ForegroundColor Green
-	$report = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-
-	# Parse Data
-	$unixEpoch = Get-Date -Date "01/01/1970"
-	for ($i = 0; $i -lt @($report).Count; $i++) {
-		$report[$i].FileSizeDisk = [Math]::Round(($report[$i].FileSizeDisk / 1000), 2) # Convert to GB
-		$report[$i].FileSizeCrawl = [Math]::Round(($report[$i].FileSizeCrawl / 1000), 2) # Convert to GB
-		$report[$i].CreatedDate = $unixEpoch.AddSeconds($report[$i].createdDate)
-		if ($report[$i].Extensions.Length -gt 32767) { # Check if Extensions field is too long
-			Write-Host "Extensions field too long!" -ForegroundColor Red
-			$report[$i].Extensions = "Too long!  See database"
+function GeneratePostScanReport ($directorySource) {
+	if ($mode -eq "import" -and $report -eq "overall") {
+		foreach ($row in $directorySource) {
+			$directory = $row.HomeDirectory
+			Write-Host "Directory: $directory"
+			$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
+						FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
+						FROM Files_Batch_Users,Files_Users 
+						WHERE Files_Batch_Users.Id = Files_Users.OwnerId AND ADHomeDirectory = '$directory'"
+			Write-Host "Query:" $query -ForegroundColor Green
+			$queryReturn += @(Invoke-SqliteQuery -Query $query -DataSource $global:DataSource)
+			Write-Host "running query"
 		}
-	}
-	
-	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
-	$logFile = $PSScriptRoot + "\report_$timestamp.xlsx"
 
-	$report | Export-Excel $logFile -WorksheetName "Report" -Title "Report"	-TitleSize 18 -TitleBold -AutoSize -MaxAutoSizeRows 2
-	
-	$excel = Open-ExcelPackage -Path $logFile
-	$sheet = $excel.Workbook.Worksheets["Report"]
-	Set-ExcelRange -Range $sheet.Cells["H2:H2"] -Value "FileSizeDisk (GB)" -AutoSize
-	Set-ExcelRange -Range $sheet.Cells["I2:I2"] -Value "FileSizeCrawl (GB)" -AutoSize
-	Set-Column -Worksheet $sheet -Column 1 -Width 3
-	Set-Column -Worksheet $sheet -Column 15 -Width 15
-	Close-ExcelPackage $excel
+		$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
+		$logFile = $PSScriptRoot + "\report_$timestamp.xlsx"
+
+	} else {
+		$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
+					FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
+					FROM Files_Batch_Users,Files_Users 
+					WHERE Files_Batch_Users.Id = Files_Users.OwnerId AND ADHomeDirectory = '$directorySource'"
+		Write-Host "Query:" $query -ForegroundColor Green
+		$queryReturn = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		Write-Host "running query"
+
+		$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
+
+		$logFile = $PSScriptRoot + "\report_$timestamp" + ($queryReturn.Id | Select-Object -Last 1) + ".xlsx"
+	}
+
+	GenerateXlsxReportMain $logFile $queryReturn
 
 	<#
 	Write-Host "running query"
@@ -219,18 +210,118 @@ function GeneratePostScanReport ($directory)
 
 
 	# Excel spreadsheet
+	$queryReturn = $null
+	if ($mode -eq "import" -and $report -eq "overall") {
+		foreach ($row in $directorySource) {
+			$directory = $row.HomeDirectory
+			Write-Host "Directory Errors: $directory"
+			$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
+						FROM Files_Batch_Users, Files_OneDrive
+						WHERE ADHomeDirectory = '$directory' AND Files_Batch_Users.id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+			Write-Host "Query:" $query -ForegroundColor Green
+			$queryReturn += @(Invoke-SqliteQuery -Query $query -DataSource $global:DataSource)
+		}
+	} else {
+		$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
+					FROM Files_Batch_Users, Files_OneDrive
+					WHERE ADHomeDirectory = '$directorySource' AND Files_Batch_Users.Id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+		Write-Host "Query:" $query -ForegroundColor Green
+		$queryReturn = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		Write-Host "running query"
+	}
+
+	GenerateXlsxReportErrors $logFile $queryReturn
+	
+	<#
+	#No Access Report
+	$logFile = $PSScriptRoot + "\no_access_" + $timestamp + "$ownerId.xlsx"
+	$report | Where-Object {$_.Error -eq "No Access"} | Group-Object -Property ParentFolder | Sort-Object -Propert Count -Descending | Select-Object Count, Name | 
+		Export-Excel $logFile -WorksheetName "No Access" -Title "No Access" -TitleSize 18 -TitleBold
+	#>
+
+}
+
+function GenerateOverallReport {
+	$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
+					FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
+					FROM Files_Batch_Users,Files_Users
+					WHERE Files_Batch_Users.Id = Files_Users.OwnerId"
+	Write-Host "Query:" $query -ForegroundColor Green
+	$queryReturn = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+	Write-Host "running query"
+
+	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
+	$logFile = $PSScriptRoot + "\report_$timestamp.xlsx"
+	GenerateXlsxReportMain $logFile $queryReturn
 
 	$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
 				FROM Files_Batch_Users, Files_OneDrive
-				WHERE ADHomeDirectory = '$directory' AND Files_Batch_Users.id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+				WHERE Files_Batch_Users.Id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
 	Write-Host "Query:" $query -ForegroundColor Green
-	$report = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+	$queryReturn = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	Write-Host "running query"
+	
+	GenerateXlsxReportErrors $logFile $queryReturn
+}
 
-	if ($report.Count -gt 0) {
-		$errors = $report | Group-Object -Property Error | Sort-Object -Property Count -Descending | Select-Object Count, Name
+function GenerateSingleReports {
+	$query = "	SELECT Id FROM Files_Batch_Users"
+	Write-Host "Query:" $query -ForegroundColor Green
+	$ids = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+
+	foreach ($id in $ids.id) {
+		$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
+					FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
+					FROM Files_Batch_Users,Files_Users
+					WHERE Files_Batch_Users.Id = $id AND Files_Batch_Users.Id = Files_Users.OwnerId"
+		Write-Host "Query:" $query -ForegroundColor Green
+		$queryReturn = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		Write-Host "running query"
+
+		$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
+		$logFile = $PSScriptRoot + "\report_$timestamp" + "_$id" + ".xlsx"
+		GenerateXlsxReportMain $logFile $queryReturn
+
+		$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
+					FROM Files_Batch_Users, Files_OneDrive
+					WHERE Files_Batch_Users.Id = $id AND Files_Batch_Users.Id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+		Write-Host "Query:" $query -ForegroundColor Green
+		$queryReturn = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		Write-Host "running query"
+	
+		GenerateXlsxReportErrors $logFile $queryReturn
+	}
+}
+
+function GenerateXlsxReportMain ($logFile, $reportData) {
+	# Parse Data
+	$unixEpoch = Get-Date -Date "01/01/1970"
+	for ($i = 0; $i -lt @($reportData).Count; $i++) {
+		$reportData[$i].FileSizeDisk = [Math]::Round(($reportData[$i].FileSizeDisk / 1000), 2) # Convert to GB
+		$reportData[$i].FileSizeCrawl = [Math]::Round(($reportData[$i].FileSizeCrawl / 1000), 2) # Convert to GB
+		$reportData[$i].CreatedDate = $unixEpoch.AddSeconds($reportData[$i].createdDate)
+		if ($reportData[$i].Extensions.Length -gt 32767) { # Check if Extensions field is too long
+			Write-Host "Extensions field too long!" -ForegroundColor Red
+			$reportData[$i].Extensions = "Too long!  See database"
+		}
+	}
+	
+	$reportData | Export-Excel $logFile -WorksheetName "Report" -Title "Report"	-TitleSize 18 -TitleBold -AutoSize -MaxAutoSizeRows 2
+	
+	$excel = Open-ExcelPackage -Path $logFile
+	$sheet = $excel.Workbook.Worksheets["Report"]
+	Set-ExcelRange -Range $sheet.Cells["H2:H2"] -Value "FileSizeDisk (GB)" -AutoSize
+	Set-ExcelRange -Range $sheet.Cells["I2:I2"] -Value "FileSizeCrawl (GB)" -AutoSize
+	Set-Column -Worksheet $sheet -Column 1 -Width 3
+	Set-Column -Worksheet $sheet -Column 15 -Width 15
+	Close-ExcelPackage $excel
+}
+
+function GenerateXlsxReportErrors ($logFile, $reportData) {
+	if ($reportData.Count -gt 0) {
+		$errors = $reportData | Group-Object -Property Error | Sort-Object -Property Count -Descending | Select-Object Count, Name
 		$errors | Export-Excel $logFile -WorksheetName "Error Report" -Title "Error Report" -TitleSize 18 -TitleBold -AutoFilter
-		$report | Export-Excel $logFile -WorksheetName "All Errors" -Title "Errors" -TitleSize 18 -TitleBold -AutoFilter -AutoSize -MaxAutoSizeRows 2
+		$reportData | Export-Excel $logFile -WorksheetName "All Errors" -Title "Errors" -TitleSize 18 -TitleBold -AutoFilter -AutoSize -MaxAutoSizeRows 2
 
 		
 		$excel = Open-ExcelPackage -Path $logFile
@@ -242,38 +333,39 @@ function GeneratePostScanReport ($directory)
 	} else {
 		"NO ERRORS" | Export-Excel $logFile -WorksheetName "Error Report" -Title "Error Report" -TitleSize 18 -TitleBold
 	}
-	
-	<#
-	#No Access Report
-	$logFile = $PSScriptRoot + "\no_access_" + $timestamp + "$ownerId.xlsx"
-	$report | Where-Object {$_.Error -eq "No Access"} | Group-Object -Property ParentFolder | Sort-Object -Propert Count -Descending | Select-Object Count, Name | 
-		Export-Excel $logFile -WorksheetName "No Access" -Title "No Access" -TitleSize 18 -TitleBold
-	#>
-
 }
 
-if ($directoryList -eq "") {
-	Write-Host "startDirectory:  $startDirectory"
-
-	CreateNewDirectoryEntry $startDirectory
-	InitPreMigrationMaster $startDirectory
-	if ($generateReports) {
-		GeneratePostScanReport $startDirectory
+if ($mode -eq "single") {
+	CreateNewDirectoryEntry $source
+	InitPreMigrationMaster $source
+	if ($report -ne "") {
+		GeneratePostScanReport $source
 	}
-} else {
-	$rows = Import-Csv $directoryList
+} elseif ($mode -eq "import") {
+	$rows = Import-Csv $source
 	foreach ($row in $rows) {
-		Write-Host "startDirectory:  $directory"
+		Write-Host "source:  $directory"
 		$directory = $row.HomeDirectory
 		CreateNewDirectoryEntry $directory
 		InitPreMigrationMaster $directory
-		if ($generateReports) {
+		if ($report -eq "single") {
 			GeneratePostScanReport $directory
 		}
 	}
+	if ($report -eq "overall") {
+		GeneratePostScanReport $rows
+	}
+} elseif ($mode -eq "report") {
+	if ($report -eq "single") {
+		GenerateSingleReports
+	} elseif ($report -eq "overall") {
+		GenerateOverallReport
+	}
+} else {
+	Write-Host "Please select a valid mode!"
 }
 
 
 Pause
 
-# usage run as admin --> .\pre_migration_master.ps1 -startDirectory "c:\test"
+# OLD!! usage run as admin --> .\pre_migration_master.ps1 -startDirectory "c:\test"

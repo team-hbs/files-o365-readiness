@@ -46,9 +46,9 @@ function InitCrawl($ownerId, $startPath, $doConvert)
         UpdateOfficeConversion $ownerId
     }
     #clean up orphaned office instances
-    Stop-Process -Name "WINWORD" -Force
-    Stop-Process -Name "EXCEL" -Force
-    Stop-Process -Name "POWERPNT" -Force
+    Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
 }
 
 
