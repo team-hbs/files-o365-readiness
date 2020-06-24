@@ -12,13 +12,22 @@ if (($mode -eq "single") -and ($source -eq "")) {
 	$source = $FileBrowser.SelectedPath
 }
 
-Install-Module PSSQLite
-Import-Module PSSQLite
-#Get-Command -Module PSSQLite
+if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) {
+    Import-Module -Name PSSQLite
+} 
+else {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Install-Module -Name PSSQLite
+}
 
 # Module for interacting with xlsx files
-Install-Module ImportExcel
-Import-Module ImportExcel
+if ((Get-Module -ListAvailable -Name ImportExcel) -ne $null) {
+    Import-Module -Name ImportExcel
+} 
+else {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Install-Module -Name ImportExcel
+}
 
 $global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 
@@ -346,11 +355,14 @@ if ($mode -eq "single") {
 	foreach ($row in $rows) {
 		Write-Host "source:  $directory"
 		$directory = $row.HomeDirectory
-		CreateNewDirectoryEntry $directory
-		InitPreMigrationMaster $directory
-		if ($report -eq "single") {
-			GeneratePostScanReport $directory
-		}
+        if ($directory.Trim() -ne "")
+        {
+		    CreateNewDirectoryEntry $directory
+		    InitPreMigrationMaster $directory
+		    if ($report -eq "single") {
+			    GeneratePostScanReport $directory
+		    }
+        }
 	}
 	if ($report -eq "overall") {
 		GeneratePostScanReport $rows
