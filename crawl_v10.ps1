@@ -29,6 +29,7 @@ function InitCrawl($ownerId, $startPath, $doConvert)
     $global:currentFileCount = 0
     $global:currentFileSize = 0
     $global:currentErrorCount = 0
+    $global:overallFileCount = (Get-ChildItem -Path $StartPath -Recurse -File | Measure-Object | Select-Object -Property Count).Count
     
     CrawlFolder $StartPath $ownerId
 	
@@ -706,6 +707,7 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 	
     $global:currentFileSize +=  ($file.length / 1000000.0)
     $global:currentFileCount += 1
+    Write-Progress -Activity "Crawl" -Status "Progress:" -PercentComplete ($global:currentFileCount / $global:overallFileCount * 100)
 	$query = ''
 	try{
 	
