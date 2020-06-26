@@ -707,7 +707,7 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 	
     $global:currentFileSize +=  ($file.length / 1000000.0)
     $global:currentFileCount += 1
-    Write-Progress -Activity "Crawl" -Status "Progress:" -PercentComplete ($global:currentFileCount / $global:overallFileCount * 100)
+    Write-Progress -Id 1 -Activity "Crawl: $startPath" -Status "Progress: $global:currentFileCount / $global:overallFileCount Files" -PercentComplete ($global:currentFileCount / $global:overallFileCount * 100)
 	$query = ''
 	try{
 	

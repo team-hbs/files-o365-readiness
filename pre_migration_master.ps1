@@ -352,7 +352,11 @@ if ($mode -eq "single") {
 	}
 } elseif ($mode -eq "import") {
 	$rows = Import-Csv $source
+	$directoriesCount = ($rows | Measure-Object).Count
+	$currentDirectory = 0
 	foreach ($row in $rows) {
+		Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
+		$currentDirectory++
 		Write-Host "source:  $directory"
 		$directory = $row.HomeDirectory
         if ($directory.Trim() -ne "")
