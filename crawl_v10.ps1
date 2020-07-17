@@ -3,6 +3,7 @@
 $global:unixEpoch = Get-Date -Date "01/01/1970"
 $global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 
+
 #function InitCrawl($ownerId, $email, $startPath, $doConvert)
 function InitCrawl($ownerId, $startPath, $doConvert)
 {
@@ -51,6 +52,7 @@ function InitCrawl($ownerId, $startPath, $doConvert)
     Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
     Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
 }
+
 
 
 function UpdateMigrationStatus($ownerId, $status)
@@ -115,9 +117,9 @@ function InsertUserEntry($ownerId, $fileCount, $fileSize, $errorCount)
 		$today = Get-Date
 		$created = [int] (New-TimeSpan -Start $unixEpoch -End $today).TotalSeconds
         #$query = "Insert INTO  $filesUsersTableName  (Email, OwnerId,FileCountDisk,FileSizeDisk,ErrorCount,CreatedDate) Values('$email', $ownerId,$fileCount,$fileSize,$errorCount,$created)"
-        $query = "Insert INTO  $filesUsersTableName  (OwnerId,FileCountDisk,FileSizeDisk,ErrorCount,CreatedDate) Values($ownerId,$fileCount,$fileSize,$errorCount,$created)"
+        $query = "INSERT INTO  $filesUsersTableName  (OwnerId,FileCountDisk,FileSizeDisk,ErrorCount,CreatedDate) VALUES ($ownerId,$fileCount,$fileSize,$errorCount,$created)"
         #write-host "Query:" $query -ForegroundColor Green 	   
-	    Invoke-SqliteQuery -Query $Query -DataSource $global:DataSource
+	    SqlQueryInsert($query)
     }
 	catch
 	{
@@ -454,7 +456,7 @@ function UpdateExtensions($ownerId)
     try
     {
         $query = "select Extension, count(*) as count from $filesTableName Where OwnerId = $ownerId AND Extension IS NOT NULL GROUP BY Extension"
-		$Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		$Result = SqlQueryReturn($query)
  
 		Foreach ($row in $Result) 
         {
@@ -467,7 +469,7 @@ function UpdateExtensions($ownerId)
             $extensions += $extension + ":" + $extensionCount
         }
         $query = "UPDATE  $filesUsersTableName SET Extensions = '$extensions' WHERE OwnerId = $ownerId"
-        $rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $rowsAffected = SqlQueryInsert($query)
     }
 	catch
 	{
@@ -483,14 +485,14 @@ function UpdateNoAccessErrorTotals($ownerId)
     try
     {
         $query = "select count(*) as count from  $filesTableName  where Error = 'No Access' AND OwnerId = $ownerId"
-        $Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $Result = SqlQueryReturn($query)
         $officeErrorCount = 0
         Foreach ($row in $Result) 
         {
             $officeErrorCount = $row.count
         }
         $query = "UPDATE  $filesUsersTableName  SET NoAccessCount = $officeErrorCount WHERE OwnerId = $ownerId"
-	    $rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+	    $rowsAffected = SqlQueryInsert($query)
 	    }
 	catch
 	{
@@ -509,14 +511,14 @@ function UpdateOfficeErrorTotals($ownerId)
   try
     {
         $query = "select count(*) as count from $filesTableName where Error IS NOT NULL AND Error <> '' AND Error <> 'No Access' AND OwnerId = $ownerId"
-        $Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $Result = SqlQueryReturn($query)
      
         Foreach ($row in $Result) 
         {
             $officeErrorCount = $row.count
         }
         $query = "UPDATE  $filesUsersTableName  SET OfficeErrorCount = $officeErrorCount WHERE OwnerId = $ownerId"
-        $rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $rowsAffected = SqlQueryInsert($query)
     }
 	catch
 	{
@@ -536,14 +538,14 @@ function UpdateMacroCount($ownerId)
   try
     {
         $query = "select count(*) as count from $filesTableName where HasMacro = 1 AND OwnerId = $ownerId"
-		$Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		$Result = SqlQueryReturn($query)
         $macroCount = 0
         Foreach ($row in $Result) 
         {
             $macroCount = $row.count
         }
         $query = "UPDATE  $filesUsersTableName  SET MacroCount = $macroCount WHERE OwnerId = $ownerId"
-        $rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $rowsAffected = SqlQueryInsert($query)
 	 }
 	catch
 	{
@@ -562,14 +564,14 @@ function UpdateOldOfficeCount($ownerId)
   try
     {
         $query = "select count(*) as count from $filesTableName where (Extension = 'doc' OR Extension = 'xls' OR Extension = 'ppt') AND OwnerId = $ownerId"
-       	$Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+       	$Result = SqlQueryReturn($query)
         $oldOfficeCount = 0
         Foreach ($row in $Result) 
         {
             $oldOfficeCount = $row.count
         }
         $query = "UPDATE  $filesUsersTableName  SET OldOfficeCount = $oldOfficeCount WHERE OwnerId = $ownerId"
-        $rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $rowsAffected = SqlQueryInsert($query)
     }
 	catch
 	{
@@ -588,14 +590,14 @@ function UpdatePathLengthCount($ownerId)
   try
     {
         $query = "select count(*) as count from $filesTableName where PathLength >= 218 AND OwnerId = $ownerId"
-        $Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $Result = SqlQueryReturn($query)
         $pathLengthCount = 0
         Foreach ($row in $Result) 
         {
             $pathLengthCount = $row.count
         }
         $query = "UPDATE  $filesUsersTableName  SET PathLengthCount = $pathLengthCount WHERE OwnerId = $ownerId"
-        $rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $rowsAffected = SqlQueryInsert($query)
     }
 	catch
 	{
@@ -614,7 +616,7 @@ function UpdateFileTotals($ownerId)
     try
     {
         $query = "select count(*) as count, Sum(CAST(size as float)) as size from $filesTableName Where OwnerId = $ownerId"
-        $Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $Result = SqlQueryReturn($query)
         $extensions = ""
         $fileCountCrawl = 0
         $fileSizeCrawl = 0
@@ -629,7 +631,7 @@ function UpdateFileTotals($ownerId)
             $fileSizeCrawl = 0
         }
         $query = "UPDATE $filesUsersTableName  SET FileCountCrawl = $fileCountCrawl, FileSizeCrawl = $fileSizeCrawl WHERE OwnerId = $ownerId"
-        $rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $rowsAffected = SqlQueryInsert($query)
     }
 	catch
 	{
@@ -646,7 +648,7 @@ function UpdateOfficeConversion($ownerId)
     try
     {
         $query = "UPDATE $filesUsersTableName  SET OfficeConversion = 1 WHERE OwnerId = $ownerId"
-        $Result = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $Result = SqlQueryInsert($query)
     }
 	catch
 	{
@@ -661,7 +663,7 @@ function UpdateOfficeConversion($ownerId)
 function InsertNoAccess($path, $ownerId)
 {
         $query = "INSERT INTO $filesTableName (Location, OwnerId, Error) VALUES ('$path', '$OwnerId','No Access')"
-		$rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		$rowsAffected = SqlQueryInsert($query)
 }
 
 function InsertRow($file, $path, $ownerId, $currentDepth)
@@ -742,8 +744,8 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
         {
             $author = $null
         }
-		$Extension = $file.Name.Split('.')[$file.Name.Split('.').length - 1]
-		$Size = $file.length / 1000000.0
+        $Extension = $file.Name.Split('.')[$file.Name.Split('.').length - 1]
+        $Size = [decimal]($file.length / 1000000.0)
 
 		$OwnerId = $ownerId
 		$Ignore = $false
@@ -784,7 +786,7 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 		$query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$tempFilePathLength,"
 		$query += "'$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20')"
 		write-host $query -ForegroundColor Green
-		$rowsAffected = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		$rowsAffected = SqlQueryInsert($query)
 		#New-Object -TypeName PsObject -Property @{FileName=$fileName;Message="success";ParentFolderCurrent=$parentFolderCurrent;Query=$query}
 	}
 	catch
