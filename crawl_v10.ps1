@@ -1,5 +1,3 @@
-
-
 $global:unixEpoch = Get-Date -Date "01/01/1970"
 $global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 
@@ -30,7 +28,7 @@ function InitCrawl($ownerId, $startPath, $doConvert)
     $global:currentFileCount = 0
     $global:currentFileSize = 0
     $global:currentErrorCount = 0
-    $global:overallFileCount = (Get-ChildItem -Path $StartPath -Recurse -File | Measure-Object | Select-Object -Property Count).Count
+    $global:overallFileCount = (Get-ChildItem -LiteralPath $StartPath -Recurse -File | Measure-Object | Select-Object -Property Count).Count
     
     CrawlFolder $StartPath $ownerId
 	
@@ -86,13 +84,13 @@ function CrawlFolder($path, $ownerId, $currentDepth)
 {
     try
     {
-	    foreach ($file in Get-ChildItem -LiteralPath $path -File -ErrorAction Stop)
+	    foreach ($file in Get-ChildItem -LiteralPath $path -File -ErrorAction Continue)
 	    {
 		    $tempPath = $path
 		    write-host $file.Name 
 		    InsertRow $file $tempPath $ownerId $currentDepth
 	    }
-        foreach ($folder in Get-ChildItem -Path $path -Directory -ErrorAction Stop)
+        foreach ($folder in Get-ChildItem -Path $path -Directory -ErrorAction Continue)
 	    {
 		    $subPath = $path + "\" + $folder.name
 		    #Get-ChildItem $subPath -File

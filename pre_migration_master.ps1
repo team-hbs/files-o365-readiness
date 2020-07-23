@@ -30,26 +30,11 @@ else {
 $global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 $global:SqlSever = $false
 
-
-# Check config for SQL Server connection if none provided
-if ($connectionString -eq "") {
-	$query = "SELECT * FROM Config WHERE Id = 1"
-	$SQLiteConfig = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	if ($SQLiteConfig -ne $null) {
-		if ($SQLiteConfig.database -eq "sql-server") {
-			if ($SQLiteConfig.connection -ne "") {
-				$connectionString = $SQLiteConfig.connection
-			}
-		}
-	}
-}
-
-# If using SQL Server connect
-if ($connectionString -ne "") {
-	$global:SqlConnection = New-Object System.Data.SqlClient.SqlConnection
-	$global:SqlConnection.ConnectionString = $connectionString
-	$global:SqlSever = $true
-}
+$smtp = "smtp.gmail.com"
+$from = "heartlandpowershell@gmail.com"
+$username = "heartlandpowershell@gmail.com"
+$password = ConvertTo-SecureString -String "heartland123" -AsPlainText -Force
+$credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $username, $password
 
 function SqlQueryInsert($query) {
 	$null = @(
@@ -88,9 +73,37 @@ function SqlQueryReturn($query) {
 		return Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	}
 }
+# Check config for SQL Server connection if none provided
+if ($connectionString -eq "") {
+	$query = "SELECT * FROM Config WHERE Id = 1"
+	$SQLiteConfig = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+	if ($SQLiteConfig -ne $null) {
+		if ($SQLiteConfig.database -eq "sql-server") {
+			if ($SQLiteConfig.connection -ne "") {
+				$connectionString = $SQLiteConfig.connection
+			}
+		}
+	}
+}
 
+# If using SQL Server connect
+if ($connectionString -ne "") {
+	$global:SqlConnection = New-Object System.Data.SqlClient.SqlConnection
+	$global:SqlConnection.ConnectionString = $connectionString
+	$global:SqlSever = $true
+}
 
-$query = "SELECT * FROM Config WHERE Id = 1"
+$query = $null
+if ($global:SqlSever) {
+	$query = "	IF (EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES
+							WHERE TABLE_NAME = 'Config'))
+				BEGIN
+					SELECT * FROM Config WHERE Id = 1
+				END"
+} else {
+	$query = "SELECT * FROM Config WHERE Id = 1"
+}
+
 $config = SqlQueryReturn($query)
 if ($config -ne $null) {
 	if (($mode -eq "") -and ($config.mode -ne "")) {
@@ -123,6 +136,13 @@ $crawlPath = $PSScriptRoot + "\crawl_v10.ps1"
 . $crawlPath
 #. .\office_cleanup.ps1
 
+function sendNotification($message) {
+	if ($notifications -eq "on") {
+		$subject = "Powershell Crawl"
+		$to = $email.Split(";")
+		Send-MailMessage -To $to -From $from -Subject $subject -Body $message -SmtpServer $smtp -Credential $credential -UseSsl -Port 587 -DeliveryNotificationOption Never
+	}
+}
 function GetUsers($batchNumber) {
 	$users = $null
 	Write-Host $batchNumber
@@ -508,6 +528,7 @@ if ($mode -eq "single") {
 	if ($report -ne "") {
 		GeneratePostScanReport $source
 	}
+	sendNotification("Scan complete!")
 } elseif ($mode -eq "import") {
 	$rows = Import-Csv $source
 	$directoriesCount = ($rows | Measure-Object).Count
@@ -529,6 +550,7 @@ if ($mode -eq "single") {
 	if ($report -eq "overall") {
 		GeneratePostScanReport $rows
 	}
+	sendNotification("Scan complete!")
 } elseif ($mode -eq "report") {
 	if ($report -eq "single") {
 		GenerateSingleReports
@@ -579,6 +601,10 @@ if ($mode -eq "single") {
 		$query = "UPDATE Config SET email = '$email' WHERE Id = 1"
 		SqlQueryInsert($query)
 	}
+
+} elseif ($mode -eq "create-database") {
+	$create_db = $PSScriptRoot + "\create_db.ps1"
+	. $create_db
 
 } elseif ($mode -eq "clear-database") {
 	if ($global:SqlSever) {
