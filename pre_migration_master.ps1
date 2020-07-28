@@ -31,8 +31,8 @@ $global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 $global:SqlSever = $false
 
 $smtp = "smtp.gmail.com"
-$from = "heartlandpowershell@gmail.com"
-$username = "heartlandpowershell@gmail.com"
+$from = "heartlandpowershellscripts@gmail.com"
+$username = "heartlandpowershellscripts@gmail.com"
 $password = ConvertTo-SecureString -String "heartland123" -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $username, $password
 
@@ -523,16 +523,34 @@ function GenerateXlsxReportErrors ($logFile, $reportData) {
 }
 
 if ($mode -eq "single") {
+	$crawlMonitor = $null
+	if ($notifications -eq "on") {
+		if ($connectionString -eq "") {
+			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -email ""$email"""
+		} else {
+			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -connectionString ""$connectionString"" -email ""$email"""
+		}
+	}
 	CreateNewDirectoryEntry $source
 	InitPreMigrationMaster $source
 	if ($report -ne "") {
 		GeneratePostScanReport $source
 	}
+	Stop-Process $crawlMonitor
 	sendNotification("Scan complete!")
 } elseif ($mode -eq "import") {
+	$crawlMonitor = $null
+	if ($notifications -eq "on") {
+		if ($connectionString -eq "") {
+			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -email ""$email"""
+		} else {
+			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -connectionString ""$connectionString"" -email ""$email"""
+		}
+	}
 	$rows = Import-Csv $source
 	$directoriesCount = ($rows | Measure-Object).Count
 	$currentDirectory = 0
+	
 	foreach ($row in $rows) {
 		Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 		$currentDirectory++
@@ -547,10 +565,13 @@ if ($mode -eq "single") {
 		    }
         }
 	}
+	
 	if ($report -eq "overall") {
 		GeneratePostScanReport $rows
 	}
+	Stop-Process $crawlMonitor
 	sendNotification("Scan complete!")
+
 } elseif ($mode -eq "report") {
 	if ($report -eq "single") {
 		GenerateSingleReports
@@ -659,7 +680,3 @@ if ($mode -eq "single") {
 	Write-Host "Please select a valid mode!"
 }
 
-
-Pause
-
-# OLD!! usage run as admin --> .\pre_migration_master.ps1 -startDirectory "c:\test"
