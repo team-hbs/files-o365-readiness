@@ -536,7 +536,9 @@ if ($mode -eq "single") {
 	if ($report -ne "") {
 		GeneratePostScanReport $source
 	}
-	Stop-Process $crawlMonitor
+	if ($notifications -eq "on") {
+		Stop-Process $crawlMonitor
+	}
 	sendNotification("Scan complete!")
 } elseif ($mode -eq "import") {
 	$crawlMonitor = $null
@@ -569,7 +571,9 @@ if ($mode -eq "single") {
 	if ($report -eq "overall") {
 		GeneratePostScanReport $rows
 	}
-	Stop-Process $crawlMonitor
+	if ($notifications -eq "on") {
+		Stop-Process $crawlMonitor
+	}
 	sendNotification("Scan complete!")
 
 } elseif ($mode -eq "report") {
