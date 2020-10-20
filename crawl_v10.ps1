@@ -666,7 +666,7 @@ function InsertNoAccess($path, $ownerId)
 
 function InsertRow($file, $path, $ownerId, $currentDepth)
 {
-<#
+
     $convertMessage = ""
 	
     $saveAs = ($doConvert -eq $true)
@@ -701,7 +701,7 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
     {
         $convertSuccessValue = 1
     }
-	#>
+
 	$tempFilePath = $path + "\" + $file.Name
     $tempFilePathLength = $tempFilePath.Length
 	
@@ -774,16 +774,18 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 		
 		
 		$RelativeFolder = $tempParentFolderCurrent.Replace($StartPath.ToLower(), "")
-		#$query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro,"
-		#$query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20) "
-		#$query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,"
-		#$query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20')"
+		$query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro,"
+		$query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20) "
+		$query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,"
+		$query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20')"
 
-		$query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,PathLength,"
+        <#
+        $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,PathLength,"
 		$query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20) "
 		$query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$tempFilePathLength,"
 		$query += "'$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20')"
-		write-host $query -ForegroundColor Green
+        #>
+        write-host $query -ForegroundColor Green
 		$rowsAffected = SqlQueryInsert($query)
 		#New-Object -TypeName PsObject -Property @{FileName=$fileName;Message="success";ParentFolderCurrent=$parentFolderCurrent;Query=$query}
 	}
