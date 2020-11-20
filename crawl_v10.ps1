@@ -3,11 +3,13 @@ $global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 
 
 #function InitCrawl($ownerId, $email, $startPath, $doConvert)
-function InitCrawl($ownerId, $startPath, $doConvert)
+function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
 {
-	$global:word = $null
-	$global:excel = $null
-	$global:powerpoint = $null
+    if ($noOffice) {
+        $global:word = $null
+        $global:excel = $null
+        $global:powerpoint = $null
+    }
 
 	$filesUsersTableName = ""
 	$filesTableName = ""
@@ -46,9 +48,11 @@ function InitCrawl($ownerId, $startPath, $doConvert)
         UpdateOfficeConversion $ownerId
     }
     #clean up orphaned office instances
-    Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
-    Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
-    Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+    if ($noOffice) {
+        Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+        Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+        Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+    }
 }
 
 
@@ -153,274 +157,279 @@ function ConvertDocument($path, $file, $saveAs)
 		if ($extension -eq "doc")
 		{
             $oldFormat = $true
-
-            if ($global:word -eq $null -OR $global:word.documents -eq $null)
-            {
-                 [gc]::collect()
-                 [gc]::WaitForPendingFinalizers()
-                 $global:word = new-object -comobject word.application
-                 $global:word.Visible = $False
-                 $global:word.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.Word.WdAlertLevel],"wdAlertsNone")
-                 #new 7/27/19
-                 #$global:excel.DisplayAlerts = $False;
-                 $global:wordSaveFormat = [Enum]::Parse([Microsoft.Office.Interop.Word.WdSaveFormat],"wdFormatDocumentDefault")
-                 $global:word.AutomationSecurity = 'msoAutomationSecurityForceDisable'
-            }
-            
-            $testFilePath = $filePath + "x"
-            if ([System.IO.File]::Exists($testFilePath) -eq $false)
-            {
-               
-                #$savename = $filePath.ToLower() -replace ".doc", ".docx"
-                $savename = $filePath.ToLower() + 'x'
-                #copy to local location
-                Write-Host "opening:" $filePath  
-                write-host "Saving as :" $savename -ForegroundColor Cyan
-                try
-                {			    
-                    #$opendoc = $global:word.documents.open($filePath,$false,$true)
-                    #new 7/27/19
-                    $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true)
-                   <#
-                        $openCounter = 0
-                        while (-not $global:word.Ready) 
-                        {
-                         write-host '.' -NoNewline
-                          sleep 1
-                          $openCounter++
-                          if ($openCounter -gt 10)
-                         {
-                            $global:word = $null
-                            Stop-Process -Name "WINWORD" -Force
-                            throw "file took too long to open"
-                         }
-                        }
-                        #>
-                        if ($opendoc -eq $null)
-                        {
-                            write-host "DOC IS NULL" -ForegroundColor yellow
-                        }
-              		if ($saveAs -eq $true)
-                    {
-                        $opendoc.saveas([ref]"$savename", [ref]$global:wordSaveFormat);
-                    }
-			        $opendoc.close($false);
-			        $converted = $true
-                }
-                catch
+            if ($noOffice) {
+                if ($global:word -eq $null -OR $global:word.documents -eq $null)
                 {
-                    if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
-                    {
-                        $tempFilePath = "c:\temp\" + $name
-                     
-                        $tempSaveName = $tempFilePath.ToLower() + 'x'
-                        #copy to local location
-                        Copy-Item $filePath -Destination $tempFilePath
-                        #$opendoc = $global:word.documents.open($tempFilePath,$false,$true)
-                        #new 7/27/19
-                        $opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true)
-                        
-                        <#
-                        $openCounter = 0
-                        while (-not $global:word.Ready) 
-                        {
-                         write-host '.' -NoNewline
-                          sleep 1
-                          $openCounter++
-                          if ($openCounter -gt 10)
-                         {
-                            $global:word = $null
-                            Stop-Process -Name "WINWORD" -Force
-                            throw "file took too long to open"
-                         }
-                        }
-                        #>
-                        if ($saveAs)
-                        {
-                            $opendoc.saveas([ref]"$tempSaveName", [ref]$global:wordSaveFormat);
-                        }
-			            $opendoc.close($false);
-                        $newTempFilePath =  "c:\temp\" + $name  + "x" 
-                        #copy back to original location
-                        if ($saveAs -eq $true)
-                        {
-                            Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
-                        }
-                        Remove-Item -Path $tempFilePath 
-                        if ($saveAs -eq $true)
-                        {
-                            Remove-Item -Path $newTempFilePath 
-                        }
-			            $converted = $true
-                    }
-                    else
-                    {
-                        throw $_
-                    }
-
+                    [gc]::collect()
+                    [gc]::WaitForPendingFinalizers()
+                    $global:word = new-object -comobject word.application
+                    $global:word.Visible = $False
+                    $global:word.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.Word.WdAlertLevel],"wdAlertsNone")
+                    #new 7/27/19
+                    #$global:excel.DisplayAlerts = $False;
+                    $global:wordSaveFormat = [Enum]::Parse([Microsoft.Office.Interop.Word.WdSaveFormat],"wdFormatDocumentDefault")
+                    $global:word.AutomationSecurity = 'msoAutomationSecurityForceDisable'
                 }
-            }
-            else
-            {
-                 $oldFormat = $false
+                
+                $testFilePath = $filePath + "x"
+                if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                {
+                
+                    #$savename = $filePath.ToLower() -replace ".doc", ".docx"
+                    $savename = $filePath.ToLower() + 'x'
+                    #copy to local location
+                    Write-Host "opening:" $filePath  
+                    write-host "Saving as :" $savename -ForegroundColor Cyan
+                    try
+                    {			    
+                        #$opendoc = $global:word.documents.open($filePath,$false,$true)
+                        #new 7/27/19
+                        $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true)
+                    <#
+                            $openCounter = 0
+                            while (-not $global:word.Ready) 
+                            {
+                            write-host '.' -NoNewline
+                            sleep 1
+                            $openCounter++
+                            if ($openCounter -gt 10)
+                            {
+                                $global:word = $null
+                                Stop-Process -Name "WINWORD" -Force
+                                throw "file took too long to open"
+                            }
+                            }
+                            #>
+                            if ($opendoc -eq $null)
+                            {
+                                write-host "DOC IS NULL" -ForegroundColor yellow
+                            }
+                        if ($saveAs -eq $true)
+                        {
+                            $opendoc.saveas([ref]"$savename", [ref]$global:wordSaveFormat);
+                        }
+                        $opendoc.close($false);
+                        $converted = $true
+                    }
+                    catch
+                    {
+                        if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                        {
+                            $tempFilePath = "c:\temp\" + $name
+                        
+                            $tempSaveName = $tempFilePath.ToLower() + 'x'
+                            #copy to local location
+                            Copy-Item $filePath -Destination $tempFilePath
+                            #$opendoc = $global:word.documents.open($tempFilePath,$false,$true)
+                            #new 7/27/19
+                            $opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true)
+                            
+                            <#
+                            $openCounter = 0
+                            while (-not $global:word.Ready) 
+                            {
+                            write-host '.' -NoNewline
+                            sleep 1
+                            $openCounter++
+                            if ($openCounter -gt 10)
+                            {
+                                $global:word = $null
+                                Stop-Process -Name "WINWORD" -Force
+                                throw "file took too long to open"
+                            }
+                            }
+                            #>
+                            if ($saveAs)
+                            {
+                                $opendoc.saveas([ref]"$tempSaveName", [ref]$global:wordSaveFormat);
+                            }
+                            $opendoc.close($false);
+                            $newTempFilePath =  "c:\temp\" + $name  + "x" 
+                            #copy back to original location
+                            if ($saveAs -eq $true)
+                            {
+                                Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
+                            }
+                            Remove-Item -Path $tempFilePath 
+                            if ($saveAs -eq $true)
+                            {
+                                Remove-Item -Path $newTempFilePath 
+                            }
+                            $converted = $true
+                        }
+                        else
+                        {
+                            throw $_
+                        }
+
+                    }
+                }
+                else
+                {
+                    $oldFormat = $false
+                }
             }
 		}
 		elseif ($extension -eq "xls")
 		{
             $oldFormat = $true
-            if ($global:excel -eq $null -OR $global:excel.workbooks -eq $null)
-            {
-                [gc]::collect()
-                [gc]::WaitForPendingFinalizers()
-                $global:excel = new-object -comobject excel.application
-                $global:excel.Visible = $False
-                $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
-                $global:excel.DisplayAlerts = $False;
-                $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
-            }
-            $testFilePath = $filePath + "x"
-            if ([System.IO.File]::Exists($testFilePath) -eq $false)
-            {
-                try
+            if ($noOffice) {
+                if ($global:excel -eq $null -OR $global:excel.workbooks -eq $null)
                 {
-                   
-                    $savename = $filePath.ToLower() + 'x'
-
-			        $workBook  =  $global:excel.workbooks.open("$filePath", 0, 0, 5, "")
-                    if ($workbook.HasVBProject)
-                    {
-                        $result.HasMacro = $true
-                        $savename = $savename -Replace ".xlsx", ".xlsm"
-                        $workBook.saveas([ref]"$savename", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
-                    }
-                    else
-                    {
-              	      #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
-
-                      if ($saveAs -eq $true)
-                        {
-                            $workBook.saveas([ref]"$savename", [ref]$global:excelSaveFormat);
-                        }
-                    }
-			        $workBook.close($false);
-			        $converted = $true
+                    [gc]::collect()
+                    [gc]::WaitForPendingFinalizers()
+                    $global:excel = new-object -comobject excel.application
+                    $global:excel.Visible = $False
+                    $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
+                    $global:excel.DisplayAlerts = $False;
+                    $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
                 }
-                catch
+                $testFilePath = $filePath + "x"
+                if ([System.IO.File]::Exists($testFilePath) -eq $false)
                 {
-                    if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                    try
                     {
-                        $tempFilePath = "c:\temp\" + $name
-                        #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
-                        $tempSaveName = $tempFilePath.ToLower() + 'x'
-                        #copy to local location
-                        Copy-Item $filePath -Destination $tempFilePath
-                        $workBook  =  $global:excel.workbooks.open("$tempFilePath", 0, 0, 5, "")
+                    
+                        $savename = $filePath.ToLower() + 'x'
+
+                        $workBook  =  $global:excel.workbooks.open("$filePath", 0, 0, 5, "")
                         if ($workbook.HasVBProject)
                         {
-                             $result.HasMacro = $true
-                             $tempSaveName = $tempSaveName -Replace ".xlsx", ".xlsm"
-                             $workBook.saveas([ref]"$tempSaveName", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+                            $result.HasMacro = $true
+                            $savename = $savename -Replace ".xlsx", ".xlsm"
+                            $workBook.saveas([ref]"$savename", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
                         }
                         else
                         {
-                            if ($saveAs -eq $true)
+                        #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
+
+                        if ($saveAs -eq $true)
                             {
-			                    $workBook.saveas([ref]"$tempSaveName", [ref]$global:excelSaveFormat);
+                                $workBook.saveas([ref]"$savename", [ref]$global:excelSaveFormat);
                             }
                         }
-                       
-			            $workBook.close($false);
-			            $converted = $true
-                        #copy back to original location
-                        if ($saveAs -eq $true)
-                        {
-                            Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
-                        }
-                        Remove-Item -Path $tempFilePath 
-                       if ($saveAs -eq $true)
-                        {
-                            Remove-Item -Path $newTempFilePath 
-                        }
+                        $workBook.close($false);
+                        $converted = $true
                     }
-                    else
+                    catch
                     {
-                        throw $_
+                        if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                        {
+                            $tempFilePath = "c:\temp\" + $name
+                            #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
+                            $tempSaveName = $tempFilePath.ToLower() + 'x'
+                            #copy to local location
+                            Copy-Item $filePath -Destination $tempFilePath
+                            $workBook  =  $global:excel.workbooks.open("$tempFilePath", 0, 0, 5, "")
+                            if ($workbook.HasVBProject)
+                            {
+                                $result.HasMacro = $true
+                                $tempSaveName = $tempSaveName -Replace ".xlsx", ".xlsm"
+                                $workBook.saveas([ref]"$tempSaveName", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+                            }
+                            else
+                            {
+                                if ($saveAs -eq $true)
+                                {
+                                    $workBook.saveas([ref]"$tempSaveName", [ref]$global:excelSaveFormat);
+                                }
+                            }
+                        
+                            $workBook.close($false);
+                            $converted = $true
+                            #copy back to original location
+                            if ($saveAs -eq $true)
+                            {
+                                Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
+                            }
+                            Remove-Item -Path $tempFilePath 
+                        if ($saveAs -eq $true)
+                            {
+                                Remove-Item -Path $newTempFilePath 
+                            }
+                        }
+                        else
+                        {
+                            throw $_
+                        }
                     }
                 }
-            }
-            else
-            {
-                $oldFormat = $false
+                else
+                {
+                    $oldFormat = $false
+                }
             }
 		}
 		elseif ($extension -eq "ppt")
 		{
-             $oldFormat = $true
-             if ($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null )
-             {
-                [gc]::collect()
-                [gc]::WaitForPendingFinalizers()
-                $global:powerpoint = New-Object -ComObject PowerPoint.application
-                $global:powerpointSaveFormat = [Microsoft.Office.Interop.PowerPoint.PpSaveAsFileType]::ppSaveAsOpenXMLPresentation 
-                #$global:powerpoint.DisplayAlerts = $False;
-                #$global:powerpoint.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.PowerPoint.WdAlertLevel],"wdAlertsNone")
-                  $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
-                $global:powerpoint.AutomationSecurity = 'msoAutomationSecurityForceDisable'
-
-             }
-            $testFilePath = $filePath + "x"
-            if ([System.IO.File]::Exists($testFilePath) -eq $false)
-            {
-                try
+            $oldFormat = $true
+            if ($noOffice) {
+                if ($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null )
                 {
-			        $presentation = $global:powerpoint.Presentations.open($filePath, $true, $null, $false)
-			        #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
-                    $savename = $filePath.ToLower() + 'x'
+                    [gc]::collect()
+                    [gc]::WaitForPendingFinalizers()
+                    $global:powerpoint = New-Object -ComObject PowerPoint.application
+                    $global:powerpointSaveFormat = [Microsoft.Office.Interop.PowerPoint.PpSaveAsFileType]::ppSaveAsOpenXMLPresentation 
+                    #$global:powerpoint.DisplayAlerts = $False;
+                    #$global:powerpoint.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.PowerPoint.WdAlertLevel],"wdAlertsNone")
+                    $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
+                    $global:powerpoint.AutomationSecurity = 'msoAutomationSecurityForceDisable'
 
-                    if ($saveAs -eq $true)
-                    {
-			            $presentation.saveas([ref]"$savename", [ref]$global:powerpointSaveFormat);
-                    }
-			        $presentation.close();
-			        $converted = $true
                 }
-                catch
+                $testFilePath = $filePath + "x"
+                if ([System.IO.File]::Exists($testFilePath) -eq $false)
                 {
-                    if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                    try
                     {
-                        $tempFilePath = "c:\temp\" + $name
-                        #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
-                        $tempSaveName = $tempFilePath.ToLower() + 'x'
-                        #copy to local location
-                        Copy-Item $filePath -Destination $tempFilePath
-                        $presentation = $global:powerpoint.Presentations.open($tempFilePath, $true, $null, $false)
-			           if ($saveAs -eq $true)
+                        $presentation = $global:powerpoint.Presentations.open($filePath, $true, $null, $false)
+                        #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
+                        $savename = $filePath.ToLower() + 'x'
+
+                        if ($saveAs -eq $true)
                         {
-			                $presentation.saveas([ref]"$tempSaveName", [ref]$global:powerpointSaveFormat);
+                            $presentation.saveas([ref]"$savename", [ref]$global:powerpointSaveFormat);
                         }
                         $presentation.close();
-                       if ($saveAs -eq $true)
-                        {
-                            Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
-                        }
-                        Remove-Item -Path $tempFilePath 
-                        if ($saveAs)
-                        {
-                            Remove-Item -Path $newTempFilePath 
-                        }
                         $converted = $true
                     }
-                    else
+                    catch
                     {
-                        throw $_
+                        if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                        {
+                            $tempFilePath = "c:\temp\" + $name
+                            #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
+                            $tempSaveName = $tempFilePath.ToLower() + 'x'
+                            #copy to local location
+                            Copy-Item $filePath -Destination $tempFilePath
+                            $presentation = $global:powerpoint.Presentations.open($tempFilePath, $true, $null, $false)
+                        if ($saveAs -eq $true)
+                            {
+                                $presentation.saveas([ref]"$tempSaveName", [ref]$global:powerpointSaveFormat);
+                            }
+                            $presentation.close();
+                        if ($saveAs -eq $true)
+                            {
+                                Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
+                            }
+                            Remove-Item -Path $tempFilePath 
+                            if ($saveAs)
+                            {
+                                Remove-Item -Path $newTempFilePath 
+                            }
+                            $converted = $true
+                        }
+                        else
+                        {
+                            throw $_
+                        }
                     }
                 }
+                else
+                {
+                    $oldFormat = $false
+                }
             }
-            else
-            {
-                $oldFormat = $false
-            }
-		}
+        }
 	}
 	catch
 	{
@@ -508,7 +517,7 @@ function UpdateOfficeErrorTotals($ownerId)
    $officeErrorCount = 0
   try
     {
-        $query = "select count(*) as count from $filesTableName where Error IS NOT NULL AND Error <> '' AND Error <> 'No Access' AND OwnerId = $ownerId"
+        $query = "select count(*) as count from $filesTableName where Error IS NOT NULL AND Error <> '' AND Error <> ' ' AND Error <> 'No Access' AND OwnerId = $ownerId"
         $Result = SqlQueryReturn($query)
      
         Foreach ($row in $Result) 

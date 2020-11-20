@@ -6,7 +6,8 @@
 	[string]$database,
 	[string]$configMode,
 	[string]$notifications,
-	[string]$email
+	[string]$email,
+	[Parameter(Mandatory=$false)][switch]$noOffice
 )
 
 if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) {
@@ -124,11 +125,13 @@ if ($config -ne $null) {
 }
 
 # Display window to browse for folder
-if (($mode -eq "single") -and ($source -eq "")) {
-	Add-Type -AssemblyName System.Windows.Forms
-	$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-	$FileBrowser.ShowDialog()
-	$source = $FileBrowser.SelectedPath
+if ($noOffice) {
+	if (($mode -eq "single") -and ($source -eq "")) {
+		Add-Type -AssemblyName System.Windows.Forms
+		$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+		$FileBrowser.ShowDialog()
+		$source = $FileBrowser.SelectedPath
+	}
 }
 
 # Create the path to the crawl script and run it
@@ -209,7 +212,7 @@ function InitPreMigrationMaster($directory) {
 	ClearCrawlData $ownerId
 	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
 	$logFile = $PSScriptRoot + "\crawl_" + $timestamp + "$ownerId.csv"
-	$errors = InitCrawl $ownerId $path $false |  Select-Object FileName,Message,ParentFolderCurrent, Query
+	$errors = InitCrawl $ownerId $path $false $noOffice |  Select-Object FileName,Message,ParentFolderCurrent, Query
 	if ($global:currentErrorCount -gt 0) {
 		$errors | Export-Csv $logFile
 	}
