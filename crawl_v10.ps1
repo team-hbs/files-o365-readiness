@@ -6,10 +6,13 @@ $global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
 {
     if ($noOffice) {
+        Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
+    } else {
         $global:word = $null
         $global:excel = $null
         $global:powerpoint = $null
     }
+
 
 	$filesUsersTableName = ""
 	$filesTableName = ""
@@ -49,6 +52,8 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
     }
     #clean up orphaned office instances
     if ($noOffice) {
+        Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
+    } else {
         Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
         Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
         Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
@@ -158,6 +163,8 @@ function ConvertDocument($path, $file, $saveAs)
 		{
             $oldFormat = $true
             if ($noOffice) {
+                Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
+            } else {
                 if ($global:word -eq $null -OR $global:word.documents -eq $null)
                 {
                     [gc]::collect()
@@ -274,6 +281,8 @@ function ConvertDocument($path, $file, $saveAs)
 		{
             $oldFormat = $true
             if ($noOffice) {
+                Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
+            } else {
                 if ($global:excel -eq $null -OR $global:excel.workbooks -eq $null)
                 {
                     [gc]::collect()
@@ -364,6 +373,8 @@ function ConvertDocument($path, $file, $saveAs)
 		{
             $oldFormat = $true
             if ($noOffice) {
+                Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
+            } else {
                 if ($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null )
                 {
                     [gc]::collect()
