@@ -1,12 +1,17 @@
 ﻿param (
 	[string]$connectionString,
-	[string]$mode,
-	[string]$source,
+	[string]$mode = $null,
+	[string]$path = $null,
 	[string]$report,
 	[string]$database,
 	[string]$configMode,
 	[string]$notifications,
 	[string]$email,
+	[string]$key = '',
+	[string]$value = '',
+    [int]$batchNumber = -1,
+    [int]$ownerId = -1,
+	[boolean]$encrypt = $false,
 	[Parameter(Mandatory=$false)][switch]$noOffice
 )
 
@@ -28,8 +33,59 @@ else {
 }
 
 
-$global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
-$global:SqlSever = $false
+function GetConfig($key)
+{
+	$value = $null
+	$null = @(
+        $query = "SELECT * FROM Config WHERE Key='" + $key + "'"
+		#write-host $query -f yellow
+        $rows =  Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+		$value = $rows[0].Value 
+	)
+	if ($rows[0].Encrypted -eq 1)
+	{
+		$Ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToCoTaskMemUnicode($value)
+		$result = [System.Runtime.InteropServices.Marshal]::PtrToStringUni($Ptr)
+		[System.Runtime.InteropServices.Marshal]::ZeroFreeCoTaskMemUnicode($Ptr)
+		$value = $result
+	}
+	return $value
+}
+
+function SetConfig($key, $value, $encrypted)
+{
+	$null = @(
+		if ($encrypted)
+		{
+			$value = ConvertTo-SecureString -String [string] $value -AsPlainText -Force 
+			$encrypted = 1
+		}
+		else
+		{
+			$encrypted = 0
+		}
+	    $query = "UPDATE Config SET Value='" + $value + "',Encrypted=" + $encrypted + " WHERE Key = '" + $key + "'"
+        Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+	)
+}
+
+$global:DataSource = $PSScriptRoot + "\FilesToO365.db"
+$global:SqlServer = $false
+
+if ((GetConfig 'DatabaseMode') -eq 'SQLServer')
+{
+	$connectionString = GetConfig 'ConnectionString'
+	$databaseServer = GetConfig 'DatabaseServer'
+	$databaseName = GetConfig 'DatabaseName'
+	if ($connectionString.Trim() -eq '')
+	{
+		 $connectionString = 'Server=' + $databaseServer + ';Database=' + $databaseName + ';Integrated Security=true;'
+	}
+	$global:SqlConnection = New-Object System.Data.SqlClient.SqlConnection
+	$global:SqlConnection.ConnectionString = $connectionString
+	$global:SqlServer = $true
+}
+
 
 $smtp = "smtp.gmail.com"
 $from = "heartlandpowershellscripts@gmail.com"
@@ -37,11 +93,16 @@ $username = "heartlandpowershellscripts@gmail.com"
 $password = ConvertTo-SecureString -String "heartland123" -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $username, $password
 
+
+  
+
 function SqlQueryInsert($query) {
+   # write-host $query -f Yellow
 	$null = @(
-		if ($global:SqlSever) {
+		if ($global:SqlServer) {
 			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
 			$SqlCmd.CommandText = $query
+      
 			$SqlCmd.Connection = $global:SqlConnection
 			if ($global:SqlConnection.State -ne 1)
 			{
@@ -57,7 +118,7 @@ function SqlQueryInsert($query) {
 }
 
 function SqlQueryReturn($query) {
-	if ($global:SqlSever) {
+	if ($global:SqlServer) {
 		$DataTable = $null
 		$null = @(
 			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
@@ -74,70 +135,8 @@ function SqlQueryReturn($query) {
 		return Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	}
 }
-# Check config for SQL Server connection if none provided
-if ($connectionString -eq "") {
-	$query = "SELECT * FROM Config WHERE Id = 1"
-	$SQLiteConfig = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	if ($SQLiteConfig -ne $null) {
-		if ($SQLiteConfig.database -eq "sql-server") {
-			if ($SQLiteConfig.connection -ne "") {
-				$connectionString = $SQLiteConfig.connection
-			}
-		}
-	}
-}
 
-# If using SQL Server connect
-if ($connectionString -ne "") {
-	$global:SqlConnection = New-Object System.Data.SqlClient.SqlConnection
-	$global:SqlConnection.ConnectionString = $connectionString
-	$global:SqlSever = $true
-}
 
-$query = $null
-if ($global:SqlSever) {
-	$query = "	IF (EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES
-							WHERE TABLE_NAME = 'Config'))
-				BEGIN
-					SELECT * FROM Config WHERE Id = 1
-				END"
-} else {
-	$query = "SELECT * FROM Config WHERE Id = 1"
-}
-
-$config = SqlQueryReturn($query)
-if ($config -ne $null) {
-	if (($mode -eq "") -and ($config.mode -ne "")) {
-		$mode = $config.mode
-	}
-	if (($source -eq "") -and ($config.source -ne "")) {
-		$source = $config.source
-	}
-	if (($report -eq "") -and ($config.report -ne "")) {
-		$report = $config.report
-	}
-	if (($notifications -eq "") -and ($config.notifications -ne "")) {
-		$notifications = $config.notifications
-	}
-	if (($email -eq "") -and ($config.email -ne "")) {
-		$email = $config.email
-	}
-}
-
-# Display window to browse for folder
-if ($noOffice) {
-	if (($mode -eq "single") -and ($source -eq "")) {
-		Add-Type -AssemblyName System.Windows.Forms
-		$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-		$FileBrowser.ShowDialog()
-		$source = $FileBrowser.SelectedPath
-	}
-}
-
-# Create the path to the crawl script and run it
-$crawlPath = $PSScriptRoot + "\crawl_v10.ps1"
-. $crawlPath
-#. .\office_cleanup.ps1
 
 function sendNotification($message) {
 	if ($notifications -eq "on") {
@@ -146,12 +145,13 @@ function sendNotification($message) {
 		Send-MailMessage -To $to -From $from -Subject $subject -Body $message -SmtpServer $smtp -Credential $credential -UseSsl -Port 587 -DeliveryNotificationOption Never
 	}
 }
+
 function GetUsers($batchNumber) {
 	$users = $null
 	Write-Host $batchNumber
-	$query = "	SELECT Files_Batch_Users.ADhomeDirectory, Files_Batch_Users.Id 
-				FROM Files_Batch_Users 
-				WHERE Files_Batch_Users.BatchNumber = '$batchNumber'"
+	$query = "	SELECT Source.ADhomeDirectory, Source.Id 
+				FROM Source 
+				WHERE Source.BatchNumber = '$batchNumber'"
 	Write-Host "Query:" $query -ForegroundColor Green
 	$users = SqlQueryReturn($query)
 	Write-Host "running query"
@@ -162,10 +162,10 @@ function GetUsers($batchNumber) {
 function GetOldOfficeDocuments($directory)
 {
 	$documents = $null
-	$query = "	SELECT Files_OneDrive.Path as Path, Files_OneDrive.Id as Id, Files_OneDrive.OwnerId as OwnerId 
-				FROM Files_OneDrive, Files_Batch_Users 
+	$query = "	SELECT ScanFile.Path as Path, ScanFile.Id as Id, ScanFile.OwnerId as OwnerId 
+				FROM ScanFile, Source 
 				WHERE (Extension = 'xls' OR Extension = 'doc' OR Extension = 'ppt') 
-				AND Files_Batch_Users.Id = Files_OneDrive.OwnerID AND Files_Batch_Users.ADhomeDirectory = '$directory'"
+				AND Source.Id = ScanFile.OwnerID AND Source.ADhomeDirectory = '$directory'"
 	Write-Host "Query:" $query -ForegroundColor Green
 	$documents = SqlQueryReturn($query)
 	Write-Host "running query"
@@ -177,13 +177,13 @@ function GetNewBatch($directory) {
 	$user = $null
 	Write-Host $batchNumber
 	$query = ""
-	if ($global:SqlSever) {
+	if ($global:SqlServer) {
 		$query = "	SELECT TOP 1 *
-					FROM Files_Batch_Users
+					FROM Source
 					ORDER BY Id Desc"
 	} else {
 		$query = "	SELECT *
-					FROM Files_Batch_Users
+					FROM Source
 					ORDER BY Id Desc
 					LIMIT 1"
 	}
@@ -196,7 +196,7 @@ function GetNewBatch($directory) {
 
 function CreateNewDirectoryEntry($directory) {
  
-	$query = "Insert INTO Files_Batch_Users (SamAccountName, ADhomeDirectory,BatchNumber) VALUES ('jbaldwin', '$directory', 0)"
+	$query = "Insert INTO Source (SamAccountName, ADhomeDirectory,BatchNumber) VALUES ('jbaldwin', '$directory', 0)"
     #Write-Host "Query:" $query -ForegroundColor Green 	   
 	SqlQueryInsert($query)
 }
@@ -221,9 +221,9 @@ function InitPreMigrationMaster($directory) {
 function ClearCrawlData($ownerId) {
     try
     {
-		$query = "DELETE FROM Files_Users WHERE OwnerId = '$ownerId'"
+		$query = "DELETE FROM ScanJob WHERE OwnerId = '$ownerId'"
 		SqlQueryInsert($query)
-		$query = "DELETE FROM Files_OneDrive WHERE OwnerId = '$ownerId'"
+		$query = "DELETE FROM ScanFile WHERE OwnerId = '$ownerId'"
 		SqlQueryInsert($query)
     }
 	catch
@@ -285,16 +285,16 @@ function GeneratePostScanReport ($directorySource) {
 		foreach ($row in $directorySource) {
 			$directory = $row.HomeDirectory
 			Write-Host "Directory: $directory"
-			if ($global:SqlSever) {
+			if ($global:SqlServer) {
 				$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 							FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate, CONVERT(DATETIME, '2001-01-01', 102) as DateCreated
-							FROM Files_Batch_Users,Files_Users 
-							WHERE Files_Batch_Users.Id = Files_Users.OwnerId AND ADHomeDirectory = '$directory'"
+							FROM Source,ScanJob 
+							WHERE Source.Id = ScanJob.OwnerId AND ADHomeDirectory = '$directory'"
 			} else {
 				$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 							FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
-							FROM Files_Batch_Users,Files_Users 
-							WHERE Files_Batch_Users.Id = Files_Users.OwnerId AND ADHomeDirectory = '$directory'"
+							FROM Source,ScanJob 
+							WHERE Source.Id = ScanJob.OwnerId AND ADHomeDirectory = '$directory'"
 			}
 			Write-Host "Query:" $query -ForegroundColor Green
 			$queryReturn += @(SqlQueryReturn($query))
@@ -305,16 +305,16 @@ function GeneratePostScanReport ($directorySource) {
 		$logFile = $PSScriptRoot + "\report_$timestamp.xlsx"
 
 	} else {
-		if ($global:SqlSever) {
+		if ($global:SqlServer) {
 			$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 						FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate, CONVERT(DATETIME, '2001-01-01', 102) as DateCreated
-						FROM Files_Batch_Users,Files_Users 
+						FROM Source,ScanJob 
 						WHERE Files_Batch_Users.Id = Files_Users.OwnerId AND ADHomeDirectory = '$directorySource'"
 		} else {
 			$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 						FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
-						FROM Files_Batch_Users,Files_Users 
-						WHERE Files_Batch_Users.Id = Files_Users.OwnerId AND ADHomeDirectory = '$directorySource'"
+						FROM Source,ScanJob 
+						WHERE Source.Id = ScanJob.OwnerId AND ADHomeDirectory = '$directorySource'"
 		}
 		Write-Host "Query:" $query -ForegroundColor Green
 		$queryReturn = SqlQueryReturn($query)
@@ -326,30 +326,8 @@ function GeneratePostScanReport ($directorySource) {
 	}
 
 	#Write-Host "queryReturn"
-	#$queryReturn
+
 	GenerateXlsxReportMain $logFile $queryReturn
-
-	<#
-	Write-Host "running query"
-	#Write-Host $users
-	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
-	$logFile = $PSScriptRoot + "\report_" + $timestamp + "$ownerId.csv"
-	$report  | Export-Csv $logFile
-	
-
-	# Microsoft errors query
-	$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
-				FROM Files_Batch_Users, Files_OneDrive
-				WHERE ADHomeDirectory = '$directory' AND Files_Batch_Users.id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
-	Write-Host "Query:" $query -ForegroundColor Green
-	$report = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	Write-Host "running query"
-	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
-	$logFile = $PSScriptRoot + "\msft_errors_" + $timestamp + "$ownerId.csv"
-	$report  | Export-Csv $logFile
-	#>
-
-
 
 	# Excel spreadsheet
 	$queryReturn = $null
@@ -358,15 +336,15 @@ function GeneratePostScanReport ($directorySource) {
 			$directory = $row.HomeDirectory
 			Write-Host "Directory Errors: $directory"
 			$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
-						FROM Files_Batch_Users, Files_OneDrive
-						WHERE ADHomeDirectory = '$directory' AND Files_Batch_Users.id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+						FROM Source, ScanFile
+						WHERE ADHomeDirectory = '$directory' AND Source.id = ScanFile.OwnerId AND Error <> '' AND Error <> ' '"
 			Write-Host "Query:" $query -ForegroundColor Green
 			$queryReturn += @(SqlQueryReturn($query))
 		}
 	} else {
 		$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
-					FROM Files_Batch_Users, Files_OneDrive
-					WHERE ADHomeDirectory = '$directorySource' AND Files_Batch_Users.Id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+					FROM Source, ScanFile
+					WHERE ADHomeDirectory = '$directorySource' AND Source.Id = ScanFile.OwnerId AND Error <> '' AND Error <> ' '"
 		Write-Host "Query:" $query -ForegroundColor Green
 		$queryReturn = SqlQueryReturn($query)
 		Write-Host "running query"
@@ -384,16 +362,16 @@ function GeneratePostScanReport ($directorySource) {
 }
 
 function GenerateOverallReport {
-	if ($global:SqlSever) {
+	if ($global:SqlServer) {
 		$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 						FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate, CONVERT(DATETIME, '2001-01-01', 102) as DateCreated
-						FROM Files_Batch_Users,Files_Users
-						WHERE Files_Batch_Users.Id = Files_Users.OwnerId"
+						FROM Source,ScanJob
+						WHERE Source.Id = ScanJob.OwnerId"
 	} else {
 		$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 						FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
-						FROM Files_Batch_Users,Files_Users
-						WHERE Files_Batch_Users.Id = Files_Users.OwnerId"
+						FROM Source,ScanJob
+						WHERE Source.Id = ScanJob.OwnerId"
 	}
 	Write-Host "Query:" $query -ForegroundColor Green
 	$queryReturn = SqlQueryReturn($query)
@@ -404,8 +382,8 @@ function GenerateOverallReport {
 	GenerateXlsxReportMain $logFile $queryReturn
 
 	$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
-				FROM Files_Batch_Users, Files_OneDrive
-				WHERE Files_Batch_Users.Id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+				FROM Source, ScanFile
+				WHERE Source.Id = ScanFile.OwnerId AND Error <> '' AND Error <> ' '"
 	Write-Host "Query:" $query -ForegroundColor Green
 	$queryReturn = SqlQueryReturn($query)
 	Write-Host "running query"
@@ -419,16 +397,16 @@ function GenerateSingleReports {
 	$ids = SqlQueryReturn($query)
 
 	foreach ($id in $ids.id) {
-		if ($global:SqlSever) {
+		if ($global:SqlServer) {
 			$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 						FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate, CONVERT(DATETIME, '2001-01-01', 102) as DateCreated
-						FROM Files_Batch_Users,Files_Users
-						WHERE Files_Batch_Users.Id = $id AND Files_Batch_Users.Id = Files_Users.OwnerId"
+						FROM Source,ScanJob
+						WHERE Source.Id = $id AND Source.Id = ScanJob.OwnerId"
 		} else {
 			$query = "	SELECT Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions,
 						FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate 
-						FROM Files_Batch_Users,Files_Users
-						WHERE Files_Batch_Users.Id = $id AND Files_Batch_Users.Id = Files_Users.OwnerId"
+						FROM Source,ScanJob
+						WHERE Source.Id = $id AND Source.Id = ScanJob.OwnerId"
 		}
 		Write-Host "Query:" $query -ForegroundColor Green
 		$queryReturn = SqlQueryReturn($query)
@@ -439,8 +417,8 @@ function GenerateSingleReports {
 		GenerateXlsxReportMain $logFile $queryReturn
 
 		$query = "	SELECT OwnerId, SamAccountName, BatchNumber, ADHomeDirectory, FileName, Extension, Path, ParentFolder, Error
-					FROM Files_Batch_Users, Files_OneDrive
-					WHERE Files_Batch_Users.Id = $id AND Files_Batch_Users.Id = Files_OneDrive.OwnerId AND Error <> '' AND Error <> ' '"
+					FROM Source, ScanFile
+					WHERE Source.Id = $id AND Source.Id = ScanFile.OwnerId AND Error <> '' AND Error <> ' '"
 		Write-Host "Query:" $query -ForegroundColor Green
 		$queryReturn = SqlQueryReturn($query)
 		Write-Host "running query"
@@ -457,7 +435,7 @@ function GenerateXlsxReportMain ($logFile, $reportData) {
 		$reportData.FileSizeDisk = [Math]::Round(($reportData.FileSizeDisk / 1000), 2) # Convert to GB
 			$reportData.FileSizeCrawl = [Math]::Round(($reportData.FileSizeCrawl / 1000), 2) # Convert to GB
 
-			if ($global:SqlSever) {
+			if ($global:SqlServer) {
 				$reportData.DateCreated = $unixEpoch.AddSeconds($reportData.createdDate)
 			} else {
 				$reportData.CreatedDate = $unixEpoch.AddSeconds($reportData.createdDate)
@@ -473,7 +451,7 @@ function GenerateXlsxReportMain ($logFile, $reportData) {
 			$reportData[$i].FileSizeDisk = [Math]::Round(($reportData[$i].FileSizeDisk / 1000), 2) # Convert to GB
 			$reportData[$i].FileSizeCrawl = [Math]::Round(($reportData[$i].FileSizeCrawl / 1000), 2) # Convert to GB
 
-			if ($global:SqlSever) {
+			if ($global:SqlServer) {
 				$reportData[$i].DateCreated = $unixEpoch.AddSeconds($reportData[$i].createdDate)
 			} else {
 				$reportData[$i].CreatedDate = $unixEpoch.AddSeconds($reportData[$i].createdDate)
@@ -487,7 +465,7 @@ function GenerateXlsxReportMain ($logFile, $reportData) {
 		}
 	}
 
-	if ($global:SqlSever) {
+	if ($global:SqlServer) {
 		$reportData = $reportData | Select-Object -Property Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions, FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, DateCreated
 	} else {
 		$reportData = $reportData | Select-Object -Property Id, SamAccountName, ADHomeDirectory, FileCountDisk, FileCountCrawl, MacroCount, Extensions, FileSizeDisk, FileSizeCrawl, ErrorCount, OfficeErrorCount, OldOfficeCount, PathLengthCount, NoAccessCount, CreatedDate
@@ -525,117 +503,204 @@ function GenerateXlsxReportErrors ($logFile, $reportData) {
 
 }
 
-if ($mode -eq "single") {
-	$crawlMonitor = $null
-	if ($notifications -eq "on") {
-		if ($connectionString -eq "") {
-			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -email ""$email"""
-		} else {
-			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -connectionString ""$connectionString"" -email ""$email"""
-		}
-	}
-	CreateNewDirectoryEntry $source
-	InitPreMigrationMaster $source
-	if ($report -ne "") {
-		GeneratePostScanReport $source
-	}
-	if ($notifications -eq "on") {
-		Stop-Process $crawlMonitor
-	}
-	sendNotification("Scan complete!")
-} elseif ($mode -eq "import") {
-	$crawlMonitor = $null
-	if ($notifications -eq "on") {
-		if ($connectionString -eq "") {
-			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -email ""$email"""
-		} else {
-			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -connectionString ""$connectionString"" -email ""$email"""
-		}
-	}
-	$rows = Import-Csv $source
-	$directoriesCount = ($rows | Measure-Object).Count
-	$currentDirectory = 0
-	
-	foreach ($row in $rows) {
-		Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
-		$currentDirectory++
-		Write-Host "source:  $directory"
-		$directory = $row.HomeDirectory
-        if ($directory.Trim() -ne "")
-        {
-		    CreateNewDirectoryEntry $directory
-		    InitPreMigrationMaster $directory
-		    if ($report -eq "single") {
-			    GeneratePostScanReport $directory
-		    }
-        }
-	}
-	
-	if ($report -eq "overall") {
-		GeneratePostScanReport $rows
-	}
-	if ($notifications -eq "on") {
-		Stop-Process $crawlMonitor
-	}
-	sendNotification("Scan complete!")
 
-} elseif ($mode -eq "report") {
-	if ($report -eq "single") {
+<#
+# Display window to browse for folder
+if ($noOffice) {
+	if (($mode -eq "single") -and ($source -eq "")) {
+		Add-Type -AssemblyName System.Windows.Forms
+		$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+		$FileBrowser.ShowDialog()
+		$source = $FileBrowser.SelectedPath
+	}
+}
+
+
+#>
+# Create the path to the crawl script and run it
+$crawlPath = $PSScriptRoot + "\crawl_v11.ps1"
+. $crawlPath
+
+
+if ($mode -eq "single") 
+{
+	$crawlMonitor = $null
+	if ($notifications -eq "on") {
+		if ($connectionString -eq "") {
+			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -email ""$email"""
+		} else {
+			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -connectionString ""$connectionString"" -email ""$email"""
+		}
+	}
+	CreateNewDirectoryEntry $path
+	InitPreMigrationMaster $path
+	if ($report -ne "") {
+		GeneratePostScanReport $path
+	}
+	if ($notifications -eq "on") {
+		Stop-Process $crawlMonitor
+	}
+	sendNotification("Scan complete!")
+}
+elseif ($mode -eq "Scan") 
+{
+    if ($batchNumber -ne -1)
+    {
+        $query = "SELECT Source.ADhomeDirectory, Source.Id 
+				FROM Source 
+				WHERE Source.BatchNumber = $batchNumber
+                ORDER BY Id DESC"
+	    Write-Host "Query:" $query -ForegroundColor Green
+        $source = SqlQueryReturn($query)
+        $directoriesCount = ($source | Measure-Object).Count
+	    $currentDirectory = 0
+        foreach($row in $source)
+        {
+            Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
+	    	$currentDirectory++
+            $path = $row.ADHomeDirectory
+            $ownerId = $row.Id
+            #InitPreMigrationMaster $directory
+            InitCrawl $ownerId $path $false $noOffice
+            $currentDirectory++
+        }   
+    }
+    elseif($ownerId -ne -1)
+    {
+        $query = "SELECT Source.ADhomeDirectory, Source.Id 
+				FROM Source 
+				WHERE Source.Id = $ownerId"
+	    Write-Host "Query:" $query -ForegroundColor Green
+	    $source = SqlQueryReturn($query)
+        $directoriesCount = ($source | Measure-Object).Count
+	    $currentDirectory = 0
+        foreach($row in $source)
+        {
+            Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
+	    	$currentDirectory++
+            $path = $row.ADHomeDirectory
+            #InitPreMigrationMaster $directory
+            InitCrawl $ownerId $path $false $noOffice
+            $currentDirectory++
+        }
+    }
+    elseif ($path -ne $null)
+    {
+	    $crawlMonitor = $null
+	    if ($notifications -eq "on") 
+        {
+		    if ($connectionString -eq "") 
+            {
+    			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -email ""$email"""
+		    }
+            else
+            {
+			    $crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -connectionString ""$connectionString"" -email ""$email"""
+		    }
+	    }
+	    $rows = Import-Csv $path
+	    $directoriesCount = ($rows | Measure-Object).Count
+	    $currentDirectory = 0
+	
+	    foreach ($row in $rows) 
+        {
+    		Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
+	    	$currentDirectory++
+    		Write-Host "source:  $directory"
+		    $directory = $row.HomeDirectory
+            if ($directory.Trim() -ne "")
+            {
+		        CreateNewDirectoryEntry $directory
+		        InitPreMigrationMaster $directory
+		        if ($report -eq "single") 
+                {
+    			    GeneratePostScanReport $directory
+	    	    }
+            }
+	    }
+	
+    	if ($report -eq "overall") {
+	    	GeneratePostScanReport $rows
+	    }
+	    if ($notifications -eq "on") {
+		    Stop-Process $crawlMonitor
+	    }
+	    sendNotification("Scan complete!")
+    }
+}
+elseif ($mode -eq "report") 
+{
+	if ($report -eq "single") 
+    {
 		GenerateSingleReports
-	} elseif ($report -eq "overall") {
+	}
+    elseif ($report -eq "overall") 
+    {
 		GenerateOverallReport
 	}
-} elseif ($mode -eq "config") {
-
-	$query = "SELECT * FROM Config WHERE Id = 1"
-	$SQLiteConfig = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	if ($SQLiteConfig -eq $null) {
-		$query = "INSERT INTO Config DEFAULT VALUES"
-		Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+}
+elseif ($mode -eq 'Import')
+{
+    $importData =  Import-Csv -path $path
+    if ($importData[0].Server -eq $null)
+    {
+        #import data is sources
+        $sources = Import-Csv -path $path
+	    foreach($source in $sources)
+	    {
+		    $batchNumber = $source.BatchNumber
+		    $adHomeDirectory = $source.SourceDirectory
+		    $destinationLibrary = $source.DestinationLibrary
+		    $destinationFolder = $source.DestinationFolder
+		    $email = $source.Email
+		    $query = "INSERT INTO Source (SamAccountName, ADHomeDirectory, DestinationLibrary, BatchNumber, DestinationFolder) VALUES ('$email','$adHomeDirectory','$destinationLibrary', $batchNumber, '$destinationFolder')"
+		    write-host $query
+            write-host "Query:" $query -ForegroundColor Green 	   
+            SqlQueryInsert($query)
+	    }
+    }
+    else
+    {
+        #import data is batches
+        $batches = Import-Csv -path $path
+	    foreach($batch in $batches)
+	    {
+		    $batchNumber = $batch.BatchNumber
+		    $runDate = $batch.RunDate
+            $cutoffDate = $batch.CutoffDate
+            $server = $batch.Server
+		    $query = "INSERT INTO Batch (BatchNumber, RunDate, CutoffDate, Server) VALUES ($batchNumber,$runDate,$cutoffDate,'$server')"
+		    write-host $query
+            write-host "Query:" $query -ForegroundColor Green 	   
+            SqlQueryInsert($query)
+	    }
+    }
+}
+elseif ($mode -eq 'SetConfig')
+{
+	SetConfig $key $value $encrypt
+    write-host 'Updating' $key 'to' $value -f Green
+}
+elseif($mode -eq 'GetConfig')
+{
+	$configValue = GetConfig $key
+    write-host 'Getting' $key 'Value:' $configValue -f Green
+}
+elseif($mode -eq 'CreateDatabase')
+{
+	if (GetConfig 'DatabaseMode' -eq 'SQLServer')
+	{
+		$create_db = $PSScriptRoot + "\create_db.ps1"
+		. $create_db
 	}
-
-	$query = "SELECT * FROM Config WHERE Id = 1"
-	$config = SqlQueryReturn($query)
-	if ($config -eq $null) {
-		$query = "INSERT INTO Config DEFAULT VALUES"
-		SqlQueryInsert($query)
+	else
+	{
+		write-host 'Cannot Create Database in SQLite Mode' -f Yellow
 	}
-
-	if ($connectionString -ne "") {
-		$query = "UPDATE Config SET connection = '$connectionString' WHERE Id = 1"
-		Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	}
-	if ($configMode -ne "") {
-		$query = "UPDATE Config SET mode = '$configMode' WHERE Id = 1"
-		SqlQueryInsert($query)
-	}
-	if ($source -ne "") {
-		$query = "UPDATE Config SET source = '$source' WHERE Id = 1"
-		SqlQueryInsert($query)
-	}
-	if ($report -ne "") {
-		$query = "UPDATE Config SET report = '$report' WHERE Id = 1"
-		SqlQueryInsert($query)
-	}
-	if ($database -ne "") {
-		$query = "UPDATE Config SET database = ""$database"" WHERE Id = 1"
-		Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	}
-	if ($notifications -ne "") {
-		$query = "UPDATE Config SET notifications = '$notifications' WHERE Id = 1"
-		SqlQueryInsert($query)
-	}
-	if ($email -ne "") {
-		$query = "UPDATE Config SET email = '$email' WHERE Id = 1"
-		SqlQueryInsert($query)
-	}
-
-} elseif ($mode -eq "create-database") {
-	$create_db = $PSScriptRoot + "\create_db.ps1"
-	. $create_db
-
-} elseif ($mode -eq "clear-database") {
-	if ($global:SqlSever) {
+}
+elseif ($mode -eq "ClearDatabase") 
+{
+	if ($global:SqlServer) {
 		$query = "	DELETE FROM Config;
 					DELETE FROM Files_Batch_Users;
 					DELETE FROM Files_OneDrive;
@@ -645,8 +710,6 @@ if ($mode -eq "single") {
 					DBCC CHECKIDENT (Files_OneDrive, RESEED, 0);"
 		SqlQueryInsert($query)
 	}
-
-
 	$query = "SELECT * FROM Config"
 	$Config = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	if ($Config -ne $null) {
@@ -654,36 +717,44 @@ if ($mode -eq "single") {
 		Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	}
 
-	$query = "SELECT * FROM Files_Batch_Users"
+	$query = "SELECT * FROM Source"
 	$Files_Batch_Users = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	if ($Files_Batch_Users -ne $null) {
-		$query = "DELETE FROM Files_Batch_Users"
+		$query = "DELETE FROM Source"
 		Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	}
 
-	$query = "SELECT * FROM Files_OneDrive"
+	$query = "SELECT * FROM ScanFile"
 	$Files_OneDrive = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	if ($Files_OneDrive -ne $null) {
 		$query = "DELETE FROM Files_OneDrive"
 		Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	}
 
-	$query = "SELECT * FROM Files_Users"
+	$query = "SELECT * FROM ScanJob"
 	$Files_Users = Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	if ($Files_Users -ne $null) {
-		$query = "DELETE FROM Files_Users"
+		$query = "DELETE FROM ScanJob"
 		Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 	}
 
 	$query = "	UPDATE sqlite_sequence SET seq = 0 WHERE name = 'Config';
-				UPDATE sqlite_sequence SET seq = 0 WHERE name = 'Files_Batch_Users';
-				UPDATE sqlite_sequence SET seq = 0 WHERE name = 'Files_OneDrive';
-				UPDATE sqlite_sequence SET seq = 0 WHERE name = 'Files_Users';"
+				UPDATE sqlite_sequence SET seq = 0 WHERE name = 'Source';
+				UPDATE sqlite_sequence SET seq = 0 WHERE name = 'ScanFile';
+				UPDATE sqlite_sequence SET seq = 0 WHERE name = 'ScanJob';"
 	Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
 
 	Write-Host "Cleared database!"
+}
+elseif($mode -eq $null)
+{
+    if ($batchNumber -ne -1)
+    {
 
-} else {
+    }
+} 
+else 
+{
 	Write-Host "Please select a valid mode!"
 }
 
