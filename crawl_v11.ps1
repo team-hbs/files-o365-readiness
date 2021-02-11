@@ -45,7 +45,17 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
     }
    
     write-host 'Getting overall count for ' $StartPath ' this may take a while....'
-    $global:overallFileCount = (Get-ChildItem -LiteralPath $tempStartPath -Recurse -File | Measure-Object | Select-Object -Property Count).Count
+    
+	#CHANGE THIS TO $true IF SCRIPT HANGS TOO LONG
+	$skipInitialFileCount = $false
+	if ($skipInitialFileCount)
+	{
+		$global:overallFileCount = 1000000000
+	}
+	else
+	{
+		$global:overallFileCount = (Get-ChildItem -LiteralPath $tempStartPath -Recurse -File | Measure-Object | Select-Object -Property Count).Count
+	}
     
     CrawlFolder $StartPath $ownerId
 	

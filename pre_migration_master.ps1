@@ -9,8 +9,8 @@
 	[string]$email,
 	[string]$key = '',
 	[string]$value = '',
-    [int]$batchNumber = -1,
-    [int]$ownerId = -1,
+    [int]$BatchNumber = -1,
+    [int]$OwnerId = -1,
 	[boolean]$encrypt = $false,
 	[Parameter(Mandatory=$false)][switch]$noOffice
 )
@@ -542,6 +542,15 @@ if ($mode -eq "single")
 	}
 	sendNotification("Scan complete!")
 }
+elseif($mode -eq 'BatchReport')
+{
+    $query = "SELECT Source.Id as OwnerId, BatchNumber, ADHomeDirectory as SourceDirectory, FileSizeDisk, OldOfficeCount, PathLengthCount,NoAccessCount, CreatedDate
+        FROM Source
+        LEFT JOIN ScanJob
+        ON Source.Id = ScanJob.OwnerId"
+    $batches = SqlQueryReturn($query)
+    $batches | Out-GridView
+}
 elseif ($mode -eq "Scan") 
 {
     if ($batchNumber -ne -1)
@@ -554,13 +563,13 @@ elseif ($mode -eq "Scan")
         $source = SqlQueryReturn($query)
         $directoriesCount = ($source | Measure-Object).Count
 	    $currentDirectory = 0
+		
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
             $ownerId = $row.Id
-            #InitPreMigrationMaster $directory
             InitCrawl $ownerId $path $false $noOffice
             $currentDirectory++
         }   
@@ -579,53 +588,29 @@ elseif ($mode -eq "Scan")
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
-            #InitPreMigrationMaster $directory
             InitCrawl $ownerId $path $false $noOffice
             $currentDirectory++
         }
     }
-    elseif ($path -ne $null)
+    else
     {
-	    $crawlMonitor = $null
-	    if ($notifications -eq "on") 
-        {
-		    if ($connectionString -eq "") 
-            {
-    			$crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -email ""$email"""
-		    }
-            else
-            {
-			    $crawlMonitor = Start-Process PowerShell.exe -PassThru -WindowStyle Hidden -Argument "-NoExit -NoProfile -ExecutionPolicy Bypass -File .\crawlmonitor.ps1 -connectionString ""$connectionString"" -email ""$email"""
-		    }
-	    }
-	    $rows = Import-Csv $path
-	    $directoriesCount = ($rows | Measure-Object).Count
+	    $query = "SELECT Source.ADhomeDirectory, Source.Id 
+				FROM Source 
+				ORDER BY Id
+				"
+	    Write-Host "Query:" $query -ForegroundColor Green
+	    $source = SqlQueryReturn($query)
+        $directoriesCount = ($source | Measure-Object).Count
 	    $currentDirectory = 0
-	
-	    foreach ($row in $rows) 
+        foreach($row in $source)
         {
-    		Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
+            Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 	    	$currentDirectory++
-    		Write-Host "source:  $directory"
-		    $directory = $row.HomeDirectory
-            if ($directory.Trim() -ne "")
-            {
-		        CreateNewDirectoryEntry $directory
-		        InitPreMigrationMaster $directory
-		        if ($report -eq "single") 
-                {
-    			    GeneratePostScanReport $directory
-	    	    }
-            }
-	    }
-	
-    	if ($report -eq "overall") {
-	    	GeneratePostScanReport $rows
-	    }
-	    if ($notifications -eq "on") {
-		    Stop-Process $crawlMonitor
-	    }
-	    sendNotification("Scan complete!")
+            $path = $row.ADHomeDirectory
+			$ownerId = $row.Id
+            InitCrawl $ownerId $path $false $noOffice
+            $currentDirectory++
+        }
     }
 }
 elseif ($mode -eq "report") 

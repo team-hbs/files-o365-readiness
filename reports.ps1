@@ -1,6 +1,6 @@
 param (
-	[int] $ownerId = -1,
-	[int] $batchNumber = -1
+	[int] $OwnerId = -1,
+	[int] $BatchNumber = -1
 )
 
 
@@ -166,6 +166,11 @@ if ($batchNumber -ne -1)
 elseif($ownerId -ne -1)
 {
 	$ownerQuery = "SELECT * FROM Source WHERE Id = $ownerId"
+	$result = SqlQueryReturn($ownerQuery)
+}
+else
+{
+	$ownerQuery = "SELECT * FROM Source ORDER BY id"
 	$result = SqlQueryReturn($ownerQuery)
 }
 
