@@ -10,17 +10,19 @@
 	[string]$key = '',
 	[string]$value = '',
     [int]$BatchNumber = -1,
-    [int]$OwnerId = -1,
-	[boolean]$encrypt = $false,
-	[Parameter(Mandatory=$false)][switch]$noOffice
+    [int]$SourceId = -1,
+	[boolean]$encrypt = $false
 )
+
+
+$OwnerId = $SourceId
+
 
 if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) {
     Import-Module -Name PSSQLite
 } 
 else {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Install-Module -Name PSSQLite
+	write-host "Please run -mode 'Install'"
 }
 
 # Module for interacting with xlsx files
@@ -28,8 +30,7 @@ if ((Get-Module -ListAvailable -Name ImportExcel) -ne $null) {
     Import-Module -Name ImportExcel
 } 
 else {
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Install-Module -Name ImportExcel
+	write-host "Please run -mode 'Install'"
 }
 
 
@@ -212,6 +213,17 @@ function InitPreMigrationMaster($directory) {
 	ClearCrawlData $ownerId
 	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
 	$logFile = $PSScriptRoot + "\crawl_" + $timestamp + "$ownerId.csv"
+	
+	$noOfficeValue = [String] (GetConfig('NoOffice') )
+    if ($noOfficeValue -eq 'true')
+    {
+		$noOffice = $true
+	}
+	else
+	{
+		$noOffice = $false
+	}
+	
 	$errors = InitCrawl $ownerId $path $false $noOffice |  Select-Object FileName,Message,ParentFolderCurrent, Query
 	if ($global:currentErrorCount -gt 0) {
 		$errors | Export-Csv $logFile
@@ -551,6 +563,15 @@ elseif($mode -eq 'BatchReport')
     $batches = SqlQueryReturn($query)
     $batches | Out-GridView
 }
+elseif($mode -eq 'Delete')
+{
+
+}
+elseif($mode -eq 'Clear')
+{
+
+
+}
 elseif ($mode -eq "Scan") 
 {
     if ($batchNumber -ne -1)
@@ -563,6 +584,16 @@ elseif ($mode -eq "Scan")
         $source = SqlQueryReturn($query)
         $directoriesCount = ($source | Measure-Object).Count
 	    $currentDirectory = 0
+		
+		$noOfficeValue = [String] (GetConfig('NoOffice') )
+		if ($noOfficeValue -eq 'true')
+		{
+			$noOffice = $true
+		}
+		else
+		{
+			$noOffice = $false
+		}
 		
         foreach($row in $source)
         {
@@ -583,6 +614,15 @@ elseif ($mode -eq "Scan")
 	    $source = SqlQueryReturn($query)
         $directoriesCount = ($source | Measure-Object).Count
 	    $currentDirectory = 0
+		$noOfficeValue = [String] (GetConfig('NoOffice') )
+		if ($noOfficeValue -eq 'true')
+		{
+			$noOffice = $true
+		}
+		else
+		{
+			$noOffice = $false
+		}
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
@@ -602,6 +642,15 @@ elseif ($mode -eq "Scan")
 	    $source = SqlQueryReturn($query)
         $directoriesCount = ($source | Measure-Object).Count
 	    $currentDirectory = 0
+		$noOfficeValue = [String] (GetConfig('NoOffice') )
+		if ($noOfficeValue -eq 'true')
+		{
+			$noOffice = $true
+		}
+		else
+		{
+			$noOffice = $false
+		}
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
@@ -623,6 +672,16 @@ elseif ($mode -eq "report")
     {
 		GenerateOverallReport
 	}
+}
+elseif($mode -eq 'Install')
+{
+	set-executionpolicy unrestricted
+	unblock-file -path .\pre_migration_master.ps1
+	unblock-file -path .\crawl_v11.ps1
+	unblock-file -path .\create_db.ps1
+	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+	Install-Module -Name PSSQLite
+    Install-Module -Name ImportExcel
 }
 elseif ($mode -eq 'Import')
 {

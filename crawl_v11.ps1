@@ -225,7 +225,10 @@ function ConvertDocument($path, $file, $saveAs)
                     $savename = $filePath.ToLower() + 'x'
                     #copy to local location
                     Write-Host "opening:" $filePath  
-                    write-host "Saving as :" $savename -ForegroundColor Cyan
+					if ($doConvert)
+					{
+						write-host "Saving as :" $savename -ForegroundColor Cyan
+					}
                     try
                     {			    
                         #$opendoc = $global:word.documents.open($filePath,$false,$true)
