@@ -1,7 +1,6 @@
 ﻿param (
 	[string]$connectionString,
 	[string]$mode = $null,
-	[string]$path = $null,
 	[string]$report,
 	[string]$database,
 	[string]$configMode,
@@ -22,7 +21,10 @@ if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) {
     Import-Module -Name PSSQLite
 } 
 else {
-	write-host "Please run -mode 'Install'"
+	if ($mode -ne 'Install')
+	{
+		write-host "Please run -mode 'Install'"
+	}
 }
 
 # Module for interacting with xlsx files
@@ -30,7 +32,10 @@ if ((Get-Module -ListAvailable -Name ImportExcel) -ne $null) {
     Import-Module -Name ImportExcel
 } 
 else {
-	write-host "Please run -mode 'Install'"
+	if ($mode -ne 'Install')
+	{
+		write-host "Please run -mode 'Install'"
+	}
 }
 
 
@@ -98,7 +103,7 @@ $credential = New-Object -TypeName System.Management.Automation.PSCredential -Ar
   
 
 function SqlQueryInsert($query) {
-   # write-host $query -f Yellow
+    write-host $query -f Yellow
 	$null = @(
 		if ($global:SqlServer) {
 			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
@@ -363,13 +368,6 @@ function GeneratePostScanReport ($directorySource) {
 	}
 
 	GenerateXlsxReportErrors $logFile $queryReturn
-	
-	<#
-	#No Access Report
-	$logFile = $PSScriptRoot + "\no_access_" + $timestamp + "$ownerId.xlsx"
-	$report | Where-Object {$_.Error -eq "No Access"} | Group-Object -Property ParentFolder | Sort-Object -Propert Count -Descending | Select-Object Count, Name | 
-		Export-Excel $logFile -WorksheetName "No Access" -Title "No Access" -TitleSize 18 -TitleBold
-	#>
 
 }
 
@@ -515,20 +513,22 @@ function GenerateXlsxReportErrors ($logFile, $reportData) {
 
 }
 
+function GetImportFile($startsIn)
+{  
+    $fileName = $null
+    $null = @(
+        [System.Reflection.Assembly]::LoadWithPartialName(“System.windows.forms”) |
+        Out-Null
+        $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+        $OpenFileDialog.initialDirectory = $startsIn
+        $OpenFileDialog.filter = 'All files (*.csv)| *.csv'
+        $OpenFileDialog.ShowDialog() | Out-Null
+        $fileName = $OpenFileDialog.filename
+    )
+    return $fileName
+} 
 
-<#
-# Display window to browse for folder
-if ($noOffice) {
-	if (($mode -eq "single") -and ($source -eq "")) {
-		Add-Type -AssemblyName System.Windows.Forms
-		$FileBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-		$FileBrowser.ShowDialog()
-		$source = $FileBrowser.SelectedPath
-	}
-}
 
-
-#>
 # Create the path to the crawl script and run it
 $crawlPath = $PSScriptRoot + "\crawl_v11.ps1"
 . $crawlPath
@@ -553,6 +553,15 @@ if ($mode -eq "single")
 		Stop-Process $crawlMonitor
 	}
 	sendNotification("Scan complete!")
+}
+elseif($mode -eq 'ConfigReport')
+{
+        $query = 'SELECT * 
+                FROM Config
+                ORDER BY Key ASC
+          '
+        $configs =  Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
+        $configs | Out-GridView
 }
 elseif($mode -eq 'BatchReport')
 {
@@ -675,7 +684,6 @@ elseif ($mode -eq "report")
 }
 elseif($mode -eq 'Install')
 {
-	set-executionpolicy unrestricted
 	unblock-file -path .\pre_migration_master.ps1
 	unblock-file -path .\crawl_v11.ps1
 	unblock-file -path .\create_db.ps1
@@ -685,11 +693,12 @@ elseif($mode -eq 'Install')
 }
 elseif ($mode -eq 'Import')
 {
-    $importData =  Import-Csv -path $path
+	$importPath = GetImportFile (Get-Location)
+    $importData =  Import-Csv -path $importPath
     if ($importData[0].Server -eq $null)
     {
         #import data is sources
-        $sources = Import-Csv -path $path
+        $sources = Import-Csv -path $importPath
 	    foreach($source in $sources)
 	    {
 		    $batchNumber = $source.BatchNumber
@@ -706,7 +715,7 @@ elseif ($mode -eq 'Import')
     else
     {
         #import data is batches
-        $batches = Import-Csv -path $path
+        $batches = Import-Csv -path $importPath
 	    foreach($batch in $batches)
 	    {
 		    $batchNumber = $batch.BatchNumber

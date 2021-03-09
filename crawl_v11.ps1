@@ -111,8 +111,31 @@ function UpdateMigrationStatus($ownerId, $status)
     }
 }
 
+function WaitForKeyPress($message)
+{
+    # Check if running Powershell ISE
+    if ($psISE)
+    {
+        Add-Type -AssemblyName System.Windows.Forms
+        [System.Windows.Forms.MessageBox]::Show("$message")
+    }
+    else
+    {
+        Write-Host "$message" -ForegroundColor Yellow
+        $x = $host.ui.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    }
+}
+
 function CrawlFolder($path, $ownerId, $currentDepth)
 {
+	#check for stop file
+	$workingDirectory = (Get-Location)
+	$stopFile = $workingDirectory.Path + '\pause.txt'
+	if (Test-Path -Path $stopFile -PathType Leaf)
+	{
+		WaitForKeyPress 'Delete pause.txt and Press Any Key To Continue'
+	}
+
     try
     {
         if ($path.StartsWith('\\'))
@@ -189,7 +212,7 @@ function ConvertDocument($path, $file, $saveAs)
 
     $filePath = $path + "\" + $file.Name
     $name = $file.Name
-    write-host "ConvertDocument()" $filePath 
+    write-host "Inspecting:" $filePath 
 	$parts = $filePath.Split('.')
 	$extension = $parts[$parts.length - 1]
 	$baseFileName = $filePath.Replace("." + $extension, "")
@@ -215,6 +238,7 @@ function ConvertDocument($path, $file, $saveAs)
                     #$global:excel.DisplayAlerts = $False;
                     $global:wordSaveFormat = [Enum]::Parse([Microsoft.Office.Interop.Word.WdSaveFormat],"wdFormatDocumentDefault")
                     $global:word.AutomationSecurity = 'msoAutomationSecurityForceDisable'
+					#$global:word.AutoRecover.Enabled = $false
                 }
                 
                 $testFilePath = $filePath + "x"
@@ -236,12 +260,13 @@ function ConvertDocument($path, $file, $saveAs)
                         #$opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true)
                         #new 2/5/21
                         $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
+				
                         if ($saveAs -eq $true -AND $opendoc -ne $null)
                         {
                             $opendoc.saveas([ref]"$savename", [ref]$global:wordSaveFormat);
                             $converted = $true
-                            $opendoc.close($false)
                         }
+						$opendoc.close($false)
                         if ($opendoc -eq $null)
                         {
                             write-host "DOC IS NULL" -ForegroundColor yellow
@@ -262,11 +287,12 @@ function ConvertDocument($path, $file, $saveAs)
                             #$opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true)
                             #new 2/5/21
                             $opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true,$false,'')
+							
                             if ($saveAs)
                             {
                                 $opendoc.saveas([ref]"$tempSaveName", [ref]$global:wordSaveFormat);
                             }
-                            #$opendoc.close($false);
+                            $opendoc.close($false);
                             $newTempFilePath =  "c:\temp\" + $name  + "x" 
                             #copy back to original location
                             if ($saveAs -eq $true)
@@ -315,17 +341,16 @@ function ConvertDocument($path, $file, $saveAs)
                     $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
                     $global:excel.DisplayAlerts = $False;
                     $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
+					#$global:excel.AutoRecover.Enabled = $false
                 }
                 $testFilePath = $filePath + "x"
                 if ([System.IO.File]::Exists($testFilePath) -eq $false)
                 {
                     try
                     {
-                    
                         $savename = $filePath.ToLower() + 'x'
-
                         $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
-       
+						
                         if ($workbook.HasVBProject)
                         {
                             $result.HasMacro = $true
@@ -354,6 +379,7 @@ function ConvertDocument($path, $file, $saveAs)
                             #copy to local location
                             Copy-Item $filePath -Destination $tempFilePath
                             $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
+
                             if ($workbook.HasVBProject)
                             {
                                 $result.HasMacro = $true
@@ -416,7 +442,7 @@ function ConvertDocument($path, $file, $saveAs)
                     #$global:powerpoint.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.PowerPoint.WdAlertLevel],"wdAlertsNone")
                     $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
                     $global:powerpoint.AutomationSecurity = 'msoAutomationSecurityForceDisable'
-
+					#$global:powerpoint.AutoRecover.Enabled = $false
                 }
                 $testFilePath = $filePath + "x"
                 if ([System.IO.File]::Exists($testFilePath) -eq $false)
