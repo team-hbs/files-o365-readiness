@@ -557,8 +557,8 @@ if ($mode -eq "single")
 
 	$computerName = [System.Net.Dns]::GetHostName()
 	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
-	$makeLocation = "https://migrationstoragehbstemp.blob.core.windows.net/" + $computerName + "?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
-	$uploadLocation = "https://migrationstoragehbstemp.blob.core.windows.net/" + $computerName + "/" + $timestamp + "/?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	$makeLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	$uploadLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "/" + $timestamp + "/?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
 	
 	$makeString = "azcopy make ""$makeLocation"""
 	Write-Host $makeString
@@ -687,8 +687,8 @@ elseif ($mode -eq "Scan")
 
 	$computerName = [System.Net.Dns]::GetHostName()
 	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
-	$makeLocation = "https://migrationstoragehbstemp.blob.core.windows.net/" + $computerName + "?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
-	$uploadLocation = "https://migrationstoragehbstemp.blob.core.windows.net/" + $computerName + "/" + $timestamp + "/?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	$makeLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	$uploadLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "/" + $timestamp + "/?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
 	
 	$makeString = "azcopy make ""$makeLocation"""
 	Write-Host $makeString
