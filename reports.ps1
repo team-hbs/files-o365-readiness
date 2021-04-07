@@ -21,6 +21,7 @@ else {
     Install-Module -Name ImportExcel
 }
 
+
 #$global:DataSource = $PSScriptRoot + "\FileToOneDrive.db"
 
 function GetConfig($key)
@@ -195,6 +196,8 @@ foreach($row in $result)
 			{
 				$result.Extensions = $result.Extensions.SubString(0,3000)
 			}
+			$unixEpoch = Get-Date -Date "01/01/1970"
+			$result.CreatedDate =  $unixEpoch.AddSeconds($result.CreatedDate)
 		}
 		$result |Select * -ExcludeProperty RowError, RowState, Table, ItemArray, HasErrors | Export-Excel $logFile -WorksheetName $reportName -AutoSize -MaxAutoSizeRows 2 
 	}

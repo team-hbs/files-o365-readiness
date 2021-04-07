@@ -1,6 +1,5 @@
 set-executionpolicy unrestricted
 unblock-file -path .\pre_migration_master.ps1
-
 .\pre_migration_master.ps1 -mode 'Install' 
 
 <# Uncomment for SQL Server Mode
