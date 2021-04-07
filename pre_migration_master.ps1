@@ -1,6 +1,7 @@
 ﻿param (
 	[string]$connectionString,
 	[string]$mode = $null,
+	[string]$path = $null,
 	[string]$report,
 	[string]$database,
 	[string]$configMode,
@@ -553,6 +554,19 @@ if ($mode -eq "single")
 		Stop-Process $crawlMonitor
 	}
 	sendNotification("Scan complete!")
+
+	$computerName = [System.Net.Dns]::GetHostName()
+	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
+	$makeLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	$uploadLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "/" + $timestamp + "/?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	
+	$makeString = "azcopy make ""$makeLocation"""
+	Write-Host $makeString
+	Invoke-Expression $makeString
+	
+	$uploadString = "azcopy copy ""$PSScriptRoot\FilesToO365.db"" ""$uploadLocation"""
+	Write-Host $uploadString
+	Invoke-Expression $uploadString
 }
 elseif($mode -eq 'ConfigReport')
 {
@@ -670,6 +684,19 @@ elseif ($mode -eq "Scan")
             $currentDirectory++
         }
     }
+
+	$computerName = [System.Net.Dns]::GetHostName()
+	$timestamp =  Get-Date -f _MM_dd_HH_mm_ss
+	$makeLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	$uploadLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "/" + $timestamp + "/?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
+	
+	$makeString = "azcopy make ""$makeLocation"""
+	Write-Host $makeString
+	Invoke-Expression $makeString
+	
+	$uploadString = "azcopy copy ""$PSScriptRoot\FilesToO365.db"" ""$uploadLocation"""
+	Write-Host $uploadString
+	Invoke-Expression $uploadString
 }
 elseif ($mode -eq "report") 
 {
@@ -690,6 +717,7 @@ elseif($mode -eq 'Install')
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 	Install-Module -Name PSSQLite
     Install-Module -Name ImportExcel
+	Invoke-Expression "$PSScriptRoot\installAzCopy -InstallPath ""$PSScriptRoot"""
 }
 elseif ($mode -eq 'Import')
 {
