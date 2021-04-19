@@ -150,7 +150,20 @@ function CrawlFolder($path, $ownerId, $currentDepth)
 	    {
 		    $tempPath = $path
 		    write-host $file.Name 
-		    InsertRow $file $path $ownerId $currentDepth
+            #TODO: Check for modified vs ScanModified
+            $scanModifiedDate = GetConfig 'ScanModifiedDate'
+            if ($scanModifiedDate -ne $null)
+            {
+                $lastModified = $file.LastWriteTime
+                if ($lastModifiedDate -gt $scanModifiedDate)
+                {
+		            InsertRow $file $path $ownerId $currentDepth
+                }
+            }
+            else
+            {
+                InsertRow $file $path $ownerId $currentDepth
+            }
 	    }
         foreach ($folder in Get-ChildItem -LiteralPath $tempPath -Directory -ErrorAction Continue)
 	    {
@@ -354,14 +367,15 @@ function ConvertDocument($path, $file, $saveAs)
                         if ($workbook.HasVBProject)
                         {
                             $result.HasMacro = $true
-                            $savename = $savename -Replace ".xlsx", ".xlsm"
-                            $workBook.saveas([ref]"$savename", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+							if ($saveAs -eq $true)
+                            {
+								$savename = $savename -Replace ".xlsx", ".xlsm"
+								$workBook.saveas([ref]"$savename", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+							}
                         }
                         else
                         {
-                        #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
-
-                        if ($saveAs -eq $true)
+							if ($saveAs -eq $true)
                             {
                                 $workBook.saveas([ref]"$savename", [ref]$global:excelSaveFormat);
                             }
