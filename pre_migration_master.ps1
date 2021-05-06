@@ -17,28 +17,51 @@
 
 $OwnerId = $SourceId
 
+if ($PSVersionTable.PSVersion.Major -ge 5)
+{
+   
+}
+else
+{
+	write-host 'Powershell Version 5 or greater is required to run this script' -f Yellow
+	break
+}
 
-if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) {
+$okToRun = $false
+
+if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) 
+{
     Import-Module -Name PSSQLite
+	$okToRun = $true
 } 
-else {
+else 
+{
 	if ($mode -ne 'Install')
 	{
-		write-host "Please run -mode 'Install'"
+		write-host "Missing PSSQLite Please run -mode 'Install'" -f Yellow
+		$okToRun = $false
 	}
 }
 
 # Module for interacting with xlsx files
-if ((Get-Module -ListAvailable -Name ImportExcel) -ne $null) {
+if ((Get-Module -ListAvailable -Name ImportExcel) -ne $null) 
+{
     Import-Module -Name ImportExcel
+	$okToRun = $true
 } 
-else {
+else 
+{
 	if ($mode -ne 'Install')
 	{
-		write-host "Please run -mode 'Install'"
+		write-host "Missing ImportExcel Please run -mode 'Install'"
+		$okToRun = $false
 	}
 }
 
+if ($okToRun -eq $false)
+{
+	break
+}
 
 function GetConfig($key)
 {
@@ -594,6 +617,35 @@ elseif($mode -eq 'Clear')
 {
 
 
+}
+elseif($mode -eq 'CleanUp')
+{
+    if ($batchNumber -ne -1)
+    {
+        $query = "SELECT Source.ADhomeDirectory, Source.Id 
+				FROM Source 
+				WHERE Source.BatchNumber = $batchNumber
+                ORDER BY Id DESC"
+	    Write-Host "Query:" $query -ForegroundColor Green
+        $sources = SqlQueryReturn($query)
+       
+        foreach($row in $sources)
+        {
+			Invoke-Expression ".\office_cleanup.ps1	-ownerId $ownerId -doConvert $false" 
+        }   
+    }
+    elseif($ownerId -ne -1)
+    {
+        $query = "SELECT Source.ADhomeDirectory, Source.Id 
+				FROM Source 
+				WHERE Source.Id = $ownerId"
+	    Write-Host "Query:" $query -ForegroundColor Green
+	    $sources = SqlQueryReturn($query)
+        foreach($row in $sources)
+        {
+			Invoke-Expression ".\office_cleanup.ps1	-ownerId $ownerId -doConvert $false" 
+        }
+    }
 }
 elseif ($mode -eq "Scan") 
 {

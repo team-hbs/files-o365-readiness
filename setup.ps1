@@ -1,5 +1,7 @@
 set-executionpolicy unrestricted
 unblock-file -path .\pre_migration_master.ps1
+unblock-file -path .\crawl_v11.ps1
+unblock-file -path .\reports.ps1
 .\pre_migration_master.ps1 -mode 'Install' 
 
 <# Uncomment for SQL Server Mode
@@ -17,3 +19,5 @@ unblock-file -path .\pre_migration_master.ps1
 .\reports.ps1 -SourceId 11  #generate reports on source id (owner id)
 .\reports.ps1 -BatchNumber 0 #generate reports on batch number
 
+
+.\pre_migration_master.ps1 -mode 'SetConfig' -key 'NoOffice' -value 'true'
