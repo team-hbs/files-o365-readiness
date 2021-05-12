@@ -397,8 +397,11 @@ function ConvertDocument($path, $file, $saveAs)
                             if ($workbook.HasVBProject)
                             {
                                 $result.HasMacro = $true
-                                $tempSaveName = $tempSaveName -Replace ".xlsx", ".xlsm"
-                                $workBook.saveas([ref]"$tempSaveName", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+								if ($saveAs -eq $true)
+								{
+									$tempSaveName = $tempSaveName -Replace ".xlsx", ".xlsm"
+									$workBook.saveas([ref]"$tempSaveName", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+								}
                             }
                             else
                             {
