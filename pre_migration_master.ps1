@@ -27,41 +27,31 @@ else
 	break
 }
 
-$okToRun = $false
 
-if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) 
+if ($mode -ne 'Install')
 {
-    Import-Module -Name PSSQLite
-	$okToRun = $true
-} 
-else 
-{
-	if ($mode -ne 'Install')
+	if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) 
+	{
+		Import-Module -Name PSSQLite
+	} 
+	else 
 	{
 		write-host "Missing PSSQLite Please run -mode 'Install'" -f Yellow
-		$okToRun = $false
+		break
 	}
-}
-
-# Module for interacting with xlsx files
-if ((Get-Module -ListAvailable -Name ImportExcel) -ne $null) 
-{
-    Import-Module -Name ImportExcel
-	$okToRun = $true
-} 
-else 
-{
-	if ($mode -ne 'Install')
+	# Module for interacting with xlsx files
+	if ((Get-Module -ListAvailable -Name ImportExcel) -ne $null) 
+	{
+		Import-Module -Name ImportExcel
+	} 
+	else 
 	{
 		write-host "Missing ImportExcel Please run -mode 'Install'"
 		$okToRun = $false
+		break
 	}
 }
 
-if ($okToRun -eq $false)
-{
-	break
-}
 
 function GetConfig($key)
 {
@@ -773,13 +763,11 @@ elseif($mode -eq 'Install')
 }
 elseif ($mode -eq 'Import')
 {
-	$importPath = GetImportFile (Get-Location)
-    $importData =  Import-Csv -path $importPath
-    if ($importData[0].Server -eq $null)
-    {
-        #import data is sources
-        $sources = Import-Csv -path $importPath
-	    foreach($source in $sources)
+
+	$source s= Import-Excel $path -WorkSheetname 'Source'
+	foreach($source in $sources)
+	{
+		foreach($source in $sources)
 	    {
 		    $batchNumber = $source.BatchNumber
 		    $adHomeDirectory = $source.SourceDirectory
@@ -791,23 +779,8 @@ elseif ($mode -eq 'Import')
             write-host "Query:" $query -ForegroundColor Green 	   
             SqlQueryInsert($query)
 	    }
-    }
-    else
-    {
-        #import data is batches
-        $batches = Import-Csv -path $importPath
-	    foreach($batch in $batches)
-	    {
-		    $batchNumber = $batch.BatchNumber
-		    $runDate = $batch.RunDate
-            $cutoffDate = $batch.CutoffDate
-            $server = $batch.Server
-		    $query = "INSERT INTO Batch (BatchNumber, RunDate, CutoffDate, Server) VALUES ($batchNumber,$runDate,$cutoffDate,'$server')"
-		    write-host $query
-            write-host "Query:" $query -ForegroundColor Green 	   
-            SqlQueryInsert($query)
-	    }
-    }
+	
+	}
 }
 elseif ($mode -eq 'SetConfig')
 {
