@@ -764,7 +764,7 @@ elseif($mode -eq 'Install')
 elseif ($mode -eq 'Import')
 {
 
-	$source s= Import-Excel $path -WorkSheetname 'Source'
+	$source = Import-Excel $path -WorkSheetname 'Source'
 	foreach($source in $sources)
 	{
 		foreach($source in $sources)
