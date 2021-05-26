@@ -14,6 +14,10 @@
 	[boolean]$encrypt = $false
 )
 
+if ($email -eq $null)
+{
+	$email = ''
+}
 
 $OwnerId = $SourceId
 
@@ -535,7 +539,7 @@ function GetImportFile($startsIn)
         Out-Null
         $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
         $OpenFileDialog.initialDirectory = $startsIn
-        $OpenFileDialog.filter = 'All files (*.csv)| *.csv'
+        $OpenFileDialog.filter = 'All files (*.xlsx)| *.xlsx'
         $OpenFileDialog.ShowDialog() | Out-Null
         $fileName = $OpenFileDialog.filename
     )
@@ -763,7 +767,7 @@ elseif($mode -eq 'Install')
 }
 elseif ($mode -eq 'Import')
 {
-
+	$path = GetImportFile (Get-Location)
 	$source = Import-Excel $path -WorkSheetname 'Source'
 	foreach($source in $sources)
 	{
@@ -771,13 +775,24 @@ elseif ($mode -eq 'Import')
 	    {
 		    $batchNumber = $source.BatchNumber
 		    $adHomeDirectory = $source.SourceDirectory
-		    $destinationLibrary = $source.DestinationLibrary
-		    $destinationFolder = $source.DestinationFolder
-		    $email = $source.Email
-		    $query = "INSERT INTO Source (SamAccountName, ADHomeDirectory, DestinationLibrary, BatchNumber, DestinationFolder) VALUES ('$email','$adHomeDirectory','$destinationLibrary', $batchNumber, '$destinationFolder')"
-		    write-host $query
-            write-host "Query:" $query -ForegroundColor Green 	   
-            SqlQueryInsert($query)
+			if ($batchNumber -eq $null)
+			{
+				$batchNumber = ''
+			}
+			if ($adHomeDirectory -eq $null)
+			{
+				$adHomeDirectory = ''
+			}
+			if ($batchNumber.Trim() -ne '' -AND $adHomeDirectory.Trim() -ne '')
+			{
+				#$destinationLibrary = $source.DestinationLibrary
+				#$destinationFolder = $source.DestinationFolder
+				#$email = $source.Email
+				$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $batchNumber)"
+				write-host $query
+				write-host "Query:" $query -ForegroundColor Green 	   
+				SqlQueryInsert($query)
+			}
 	    }
 	
 	}
