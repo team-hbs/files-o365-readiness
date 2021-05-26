@@ -579,11 +579,11 @@ if ($mode -eq "single")
 	
 	$makeString = "azcopy make ""$makeLocation"""
 	Write-Host $makeString
-	Invoke-Expression $makeString
+	#Invoke-Expression $makeString
 	
 	$uploadString = "azcopy copy ""$PSScriptRoot\FilesToO365.db"" ""$uploadLocation"""
 	Write-Host $uploadString
-	Invoke-Expression $uploadString
+	#Invoke-Expression $uploadString
 }
 elseif($mode -eq 'ConfigReport')
 {
@@ -738,11 +738,11 @@ elseif ($mode -eq "Scan")
 	
 	$makeString = "azcopy make ""$makeLocation"""
 	Write-Host $makeString
-	Invoke-Expression $makeString
+	#Invoke-Expression $makeString
 	
 	$uploadString = "azcopy copy ""$PSScriptRoot\FilesToO365.db"" ""$uploadLocation"""
 	Write-Host $uploadString
-	Invoke-Expression $uploadString
+	#Invoke-Expression $uploadString
 }
 elseif ($mode -eq "report") 
 {
@@ -769,25 +769,34 @@ elseif ($mode -eq 'Import')
 {
 	$path = GetImportFile (Get-Location)
 	$sources = Import-Excel $path -WorkSheetname 'Source'
+	$counter = 0
 	foreach($source in $sources)
 	{
-		    $batchNumber = $source.BatchNumber
-		    $adHomeDirectory = $source.SourceDirectory
+			try
+			{
+				$batchNumber = $source.BatchNumber
+				$adHomeDirectory = $source.SourceDirectory
 
-			if ($adHomeDirectory -eq $null)
-			{
-				$adHomeDirectory = ''
+				if ($adHomeDirectory -eq $null)
+				{
+					$adHomeDirectory = ''
+				}
+				if ($batchNumber -ne $null -AND $adHomeDirectory.Trim() -ne '')
+				{
+					$batchNumber =  $batchNumber
+					#$destinationLibrary = $source.DestinationLibrary
+					#$destinationFolder = $source.DestinationFolder
+					#$email = $source.Email
+					$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $batchNumber)"
+					write-host $query
+					write-host "Query:" $query -ForegroundColor Green 	   
+					SqlQueryInsert($query)
+				}
+				$
 			}
-			if ($batchNumber -ne $null -AND $adHomeDirectory.Trim() -ne '')
+			catch
 			{
-				$batchNumber =  $batchNumber
-				#$destinationLibrary = $source.DestinationLibrary
-				#$destinationFolder = $source.DestinationFolder
-				#$email = $source.Email
-				$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $batchNumber)"
-				write-host $query
-				write-host "Query:" $query -ForegroundColor Green 	   
-				SqlQueryInsert($query)
+				write-host '
 			}
 	}
 }
