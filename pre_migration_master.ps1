@@ -768,23 +768,19 @@ elseif($mode -eq 'Install')
 elseif ($mode -eq 'Import')
 {
 	$path = GetImportFile (Get-Location)
-	$source = Import-Excel $path -WorkSheetname 'Source'
+	$sources = Import-Excel $path -WorkSheetname 'Source'
 	foreach($source in $sources)
 	{
-		foreach($source in $sources)
-	    {
 		    $batchNumber = $source.BatchNumber
 		    $adHomeDirectory = $source.SourceDirectory
-			if ($batchNumber -eq $null)
-			{
-				$batchNumber = ''
-			}
+
 			if ($adHomeDirectory -eq $null)
 			{
 				$adHomeDirectory = ''
 			}
-			if ($batchNumber.Trim() -ne '' -AND $adHomeDirectory.Trim() -ne '')
+			if ($batchNumber -ne $null -AND $adHomeDirectory.Trim() -ne '')
 			{
+				$batchNumber =  $batchNumber
 				#$destinationLibrary = $source.DestinationLibrary
 				#$destinationFolder = $source.DestinationFolder
 				#$email = $source.Email
@@ -793,8 +789,6 @@ elseif ($mode -eq 'Import')
 				write-host "Query:" $query -ForegroundColor Green 	   
 				SqlQueryInsert($query)
 			}
-	    }
-	
 	}
 }
 elseif ($mode -eq 'SetConfig')
