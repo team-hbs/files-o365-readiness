@@ -790,7 +790,7 @@ elseif ($mode -eq 'Import')
 					$dbSourceId = $null
 					foreach($dbSource in $dbSources)
 					{
-						if ($dbSource.ADHomeDirectory -eq $adHomeDirectory)
+						if ($dbSource.ADHomeDirectory -eq $adHomeDirectory.ToLower().Trim())
 						{
 							$dbSourceId = $dbSource.Id
 							break
@@ -802,7 +802,7 @@ elseif ($mode -eq 'Import')
 					}
 					else
 					{
-						$query = "UPDATE Source BatchNumber = $batchNumber WHERE Id = $dbSourceId"
+						$query = "UPDATE Source SET BatchNumber = $batchNumber WHERE Id = $dbSourceId"
 					}
 					write-host $query
 					write-host "Query:" $query -ForegroundColor Green 	   
