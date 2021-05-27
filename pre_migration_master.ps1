@@ -796,7 +796,7 @@ elseif ($mode -eq 'Import')
 							break
 						}
 					}
-					if ($dbSourceId -ne $null)
+					if ($dbSourceId -eq $null)
 					{
 						$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $batchNumber)"
 					}
@@ -812,7 +812,7 @@ elseif ($mode -eq 'Import')
 			}
 			catch
 			{
-				write-host '
+				write-host ''
 			}
 	}
 }

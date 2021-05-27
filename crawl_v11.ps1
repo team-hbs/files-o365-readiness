@@ -455,18 +455,16 @@ function ConvertDocument($path, $file, $saveAs)
                     [gc]::WaitForPendingFinalizers()
                     $global:powerpoint = New-Object -ComObject PowerPoint.application
                     $global:powerpointSaveFormat = [Microsoft.Office.Interop.PowerPoint.PpSaveAsFileType]::ppSaveAsOpenXMLPresentation 
-                    #$global:powerpoint.DisplayAlerts = $False;
-                    #$global:powerpoint.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.PowerPoint.WdAlertLevel],"wdAlertsNone")
                     $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
                     $global:powerpoint.AutomationSecurity = 'msoAutomationSecurityForceDisable'
-					#$global:powerpoint.AutoRecover.Enabled = $false
+
                 }
                 $testFilePath = $filePath + "x"
                 if ([System.IO.File]::Exists($testFilePath) -eq $false)
                 {
                     try
                     {
-                        $presentation = $global:powerpoint.Presentations.open($filePath, $true, $null, $false)
+                        $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
                         #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
                         $savename = $filePath.ToLower() + 'x'
 
@@ -486,7 +484,7 @@ function ConvertDocument($path, $file, $saveAs)
                             $tempSaveName = $tempFilePath.ToLower() + 'x'
                             #copy to local location
                             Copy-Item $filePath -Destination $tempFilePath
-                            $presentation = $global:powerpoint.Presentations.open($tempFilePath, $true, $null, $false)
+                            $presentation = $global:powerpoint.Presentations.open("$tempFilePath::password::", $true, $null, $false)
                             if ($saveAs -eq $true)
                             {
                                 $presentation.saveas([ref]"$tempSaveName", [ref]$global:powerpointSaveFormat);
