@@ -767,6 +767,10 @@ elseif($mode -eq 'Install')
 }
 elseif ($mode -eq 'Import')
 {
+	$query = "SELECT * 
+		FROM Source"
+	$dbSources = SqlQueryReturn($query)
+
 	$path = GetImportFile (Get-Location)
 	$sources = Import-Excel $path -WorkSheetname 'Source'
 	$counter = 0
@@ -775,7 +779,7 @@ elseif ($mode -eq 'Import')
 			try
 			{
 				$batchNumber = $source.BatchNumber
-				$adHomeDirectory = $source.SourceDirectory
+				$adHomeDirectory = $source.SourceDirectory.Trim().ToLower()
 
 				if ($adHomeDirectory -eq $null)
 				{
@@ -783,16 +787,28 @@ elseif ($mode -eq 'Import')
 				}
 				if ($batchNumber -ne $null -AND $adHomeDirectory.Trim() -ne '')
 				{
-					$batchNumber =  $batchNumber
-					#$destinationLibrary = $source.DestinationLibrary
-					#$destinationFolder = $source.DestinationFolder
-					#$email = $source.Email
-					$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $batchNumber)"
+					$dbSourceId = $null
+					foreach($dbSource in $dbSources)
+					{
+						if ($dbSource.ADHomeDirectory -eq $adHomeDirectory)
+						{
+							$dbSourceId = $dbSource.Id
+							break
+						}
+					}
+					if ($dbSourceId -ne $null)
+					{
+						$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $batchNumber)"
+					}
+					else
+					{
+						$query = "UPDATE Source BatchNumber = $batchNumber WHERE Id = $dbSourceId"
+					}
 					write-host $query
 					write-host "Query:" $query -ForegroundColor Green 	   
 					SqlQueryInsert($query)
 				}
-				$
+				
 			}
 			catch
 			{
