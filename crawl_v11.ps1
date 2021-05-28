@@ -5,6 +5,7 @@ $global:DataSource = $PSScriptRoot + "\FilesToO365.db"
 #function InitCrawl($ownerId, $email, $startPath, $doConvert)
 function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
 {
+	AddEvent -ownerId $ownerId -eventType 'ScanStarted'
     if ($noOffice) {
         Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
     } else {
@@ -80,6 +81,7 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
         Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
         Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
     }
+	AddEvent -ownerId $ownerId -eventType 'ScanEnded'
 }
 
 

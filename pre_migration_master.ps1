@@ -93,6 +93,8 @@ function SetConfig($key, $value, $encrypted)
 	)
 }
 
+
+
 $global:DataSource = $PSScriptRoot + "\FilesToO365.db"
 $global:SqlServer = $false
 
@@ -160,6 +162,12 @@ function SqlQueryReturn($query) {
 	}
 }
 
+function AddEvent($ownerId, $eventType)
+{
+	$eventDate = Get-Date
+	$query = "INSERT INTO Event (OwnerId, EventDate, Type) VALUES($ownerId, '$eventDate', '$eventType')"
+	SqlQueryInsert $query
+}
 
 
 function sendNotification($message) {

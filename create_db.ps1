@@ -35,6 +35,39 @@ $query = "  USE [" + $databaseName  + "]
 
 SqlQueryInsert($query)
 
+SqlQueryInsert($query)
+
+$query = "  USE [" + $databaseName  + "]
+
+            /****** Object:  Table [dbo].[GlobalConfig]    Script Date: 2/24/2021 11:22:00 AM ******/
+            SET ANSI_NULLS ON
+
+            SET QUOTED_IDENTIFIER ON
+
+            CREATE TABLE [dbo].[GlobalConfig](
+			    [Id] [int] IDENTITY(1,1) NOT NULL,
+                [Key] [nvarchar](max) NULL,
+                [Value] [nvarchar](max) NULL,
+                [Server] [nvarchar](max) NULL,
+            ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
+
+SqlQueryInsert($query)
+
+$query = "  USE [" + $databaseName  + "]
+
+            /****** Object:  Table [dbo].[Event]    Script Date: 2/24/2021 11:22:00 AM ******/
+            SET ANSI_NULLS ON
+
+            SET QUOTED_IDENTIFIER ON
+
+            CREATE TABLE [dbo].[Event](
+			    [Id] [int] IDENTITY(1,1) NOT NULL,
+                [OwnerId] [int]  NULL,
+                [EventType] [nvarchar](max) NULL
+            ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
+
+SqlQueryInsert($query)
+
 $query = "  USE [" + $databaseName  + "]
 
             /****** Object:  Table [dbo].[Source]    Script Date: 8/4/2020 11:47:51 AM ******/
