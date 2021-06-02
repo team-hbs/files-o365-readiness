@@ -63,7 +63,8 @@ $query = "  USE [" + $databaseName  + "]
             CREATE TABLE [dbo].[Event](
 			    [Id] [int] IDENTITY(1,1) NOT NULL,
                 [OwnerId] [int]  NULL,
-                [EventType] [nvarchar](max) NULL
+                [EventType] [nvarchar](max) NULL,
+				[EventDate] [datetime] NULL
             ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
 
 SqlQueryInsert($query)

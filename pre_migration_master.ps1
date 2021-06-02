@@ -165,7 +165,7 @@ function SqlQueryReturn($query) {
 function AddEvent($ownerId, $eventType)
 {
 	$eventDate = Get-Date
-	$query = "INSERT INTO Event (OwnerId, EventDate, Type) VALUES($ownerId, '$eventDate', '$eventType')"
+	$query = "INSERT INTO Event (OwnerId, EventDate, EventType) VALUES($ownerId, '$eventDate', '$eventType')"
 	SqlQueryInsert $query
 }
 
