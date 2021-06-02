@@ -360,7 +360,8 @@ $query = "  USE [" + $databaseName + "]
                 [NoAccessCount] [int] NULL,
                 [CreatedDate] [datetime] NULL,
                 [SpmtProcess] [int] NULL,
-                [SpmtMessage] [nvarchar](max) NULL
+                [SpmtMessage] [nvarchar](max) NULL,
+				[UserReportPath] [nvarchar](max) NULL
             ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
 
 SqlQueryInsert($query)
