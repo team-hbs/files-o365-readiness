@@ -163,6 +163,7 @@ $query = "  USE [" + $databaseName  + "]
             SET QUOTED_IDENTIFIER ON
 
             CREATE TABLE [dbo].[ScanJob](
+			    [Id] [int] IDENTITY(1,1) NOT NULL,
                 [OwnerId] [int] NOT NULL,
                 [FileCountDisk] [int] NULL,
                 [FileCountCrawl] [int] NULL,
@@ -336,6 +337,7 @@ $query = "  USE [" + $databaseName + "]
             SET QUOTED_IDENTIFIER ON
 
             CREATE TABLE [dbo].[MigrationJob](
+			    [Id] [int] IDENTITY(1,1) NOT NULL,
                 [OwnerId] [int] NULL,
                 [Email] [nvarchar](max) NULL,
                 [FileCountDisk] [int] NULL,
