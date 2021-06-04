@@ -11,7 +11,8 @@
 	[string]$value = '',
     [int]$BatchNumber = -1,
     [int]$SourceId = -1,
-	[boolean]$encrypt = $false
+	[boolean]$encrypt = $false,
+	[string] $lastModifiedDate = $null
 )
 
 if ($email -eq $null)
@@ -678,7 +679,15 @@ elseif ($mode -eq "Scan")
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
             $ownerId = $row.Id
-            InitCrawl $ownerId $path $false $noOffice
+			#$ownerId, $startPath, $doConvert, $noOffice)
+			if ($lastModifiedDate -eq $null)
+			{
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
+			}
+			else
+			{
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
+			}
             $currentDirectory++
         }   
     }
@@ -705,7 +714,14 @@ elseif ($mode -eq "Scan")
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
-            InitCrawl $ownerId $path $false $noOffice
+			if ($lastModifiedDate -eq $null)
+			{
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
+			}
+			else
+			{
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
+			}
             $currentDirectory++
         }
     }
@@ -751,17 +767,6 @@ elseif ($mode -eq "Scan")
 	$uploadString = "azcopy copy ""$PSScriptRoot\FilesToO365.db"" ""$uploadLocation"""
 	Write-Host $uploadString
 	#Invoke-Expression $uploadString
-}
-elseif ($mode -eq "report") 
-{
-	if ($report -eq "single") 
-    {
-		GenerateSingleReports
-	}
-    elseif ($report -eq "overall") 
-    {
-		GenerateOverallReport
-	}
 }
 elseif($mode -eq 'Install')
 {

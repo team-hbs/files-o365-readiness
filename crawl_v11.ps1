@@ -1,11 +1,18 @@
 $global:unixEpoch = Get-Date -Date "01/01/1970"
 $global:DataSource = $PSScriptRoot + "\FilesToO365.db"
-
+$global:LastModifiedDate = $null
 
 #function InitCrawl($ownerId, $email, $startPath, $doConvert)
-function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
+function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $lastModifiedDate)
 {
-	AddEvent -ownerId $ownerId -eventType 'ScanStarted'
+	if ($lastModifiedDate -eq $null)
+	{
+		AddEvent -ownerId $ownerId -eventType 'ScanStarted'
+	}
+	else
+	{
+		AddEvent -ownerId $ownerId -eventType 'LastModifiedScanStarted'
+	}
     if ($noOffice) {
         Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
     } else {
@@ -13,7 +20,6 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
         $global:excel = $null
         $global:powerpoint = $null
     }
-
 
 	$filesUsersTableName = ""
 	$filesTableName = ""
@@ -27,7 +33,8 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
 		$filesUsersTableName = "ScanJob"
 		$filesTableName = "ScanFile"
 	}
-
+	
+	$global:LastModifiedDate = $lastModifiedDate
 
     $StartPath = $path
     $ownerId = $ownerId
@@ -81,7 +88,14 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
         Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
         Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
     }
-	AddEvent -ownerId $ownerId -eventType 'ScanEnded'
+	if ($lastModifiedDate -eq $null)
+	{
+		AddEvent -ownerId $ownerId -eventType 'ScanEnded'
+	}
+	else
+	{
+		AddEvent -ownerId $ownerId -eventType 'LastModifiedScanEnded'
+	}
 }
 
 
@@ -153,10 +167,14 @@ function CrawlFolder($path, $ownerId, $currentDepth)
 		    $tempPath = $path
 		    write-host $file.Name 
             #TODO: Check for modified vs ScanModified
-            $scanModifiedDate = GetConfig 'ScanModifiedDate'
+            $scanModifiedDate = 
             if ($scanModifiedDate -ne $null)
             {
                 $lastModified = $file.LastWriteTime
+				if ($global:LastModifiedDate -ne $null)
+				{
+					$scanModifiedDate = Get-Date $global:LastModifiedDate
+				}
                 if ($lastModifiedDate -gt $scanModifiedDate)
                 {
 		            InsertRow $file $path $ownerId $currentDepth
