@@ -66,19 +66,21 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $lastModifiedDat
 	}
     
     CrawlFolder $StartPath $ownerId
-	
-    InsertUserEntry $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
-    UpdateExtensions $ownerId
-    UpdateFileTotals $ownerId
-    UpdateOfficeErrorTotals $ownerId
-    UpdateMacroCount $ownerId
-    UpdateOldOfficeCount $ownerId
-    UpdatePathLengthCount  $ownerId
-    UpdateNoAccessErrorTotals $ownerId
-	
-    if ($doConvert -eq $true)
+	if ($lastModifiedDate -eq $null)
     {
-        UpdateOfficeConversion $ownerId
+        InsertUserEntry $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
+        UpdateExtensions $ownerId
+        UpdateFileTotals $ownerId
+        UpdateOfficeErrorTotals $ownerId
+        UpdateMacroCount $ownerId
+        UpdateOldOfficeCount $ownerId
+        UpdatePathLengthCount  $ownerId
+        UpdateNoAccessErrorTotals $ownerId
+    	
+        if ($doConvert -eq $true)
+        {
+            UpdateOfficeConversion $ownerId
+        }
     }
     #clean up orphaned office instances
     if ($noOffice) {
@@ -167,15 +169,12 @@ function CrawlFolder($path, $ownerId, $currentDepth)
 		    $tempPath = $path
 		    write-host $file.Name 
             #TODO: Check for modified vs ScanModified
-            $scanModifiedDate = 
-            if ($scanModifiedDate -ne $null)
+          
+            if ($global:LastModifiedDate -ne $null)
             {
                 $lastModified = $file.LastWriteTime
-				if ($global:LastModifiedDate -ne $null)
-				{
-					$scanModifiedDate = Get-Date $global:LastModifiedDate
-				}
-                if ($lastModifiedDate -gt $scanModifiedDate)
+				$created = $file.CreationTime
+                if ($lastModified -gt (Get-Date $global:LastModifiedDate) -OR $created -gt (Get-Date $global:LastModifiedDate))
                 {
 		            InsertRow $file $path $ownerId $currentDepth
                 }
@@ -888,22 +887,25 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 		if ($arrPathSplits.length -gt 19) { $Folder19 = $arrPathSplits[19].Trim().ToLower()}
 		if ($arrPathSplits.length -gt 20) { $Folder20 = $arrPathSplits[20].Trim().ToLower()}
 		
+   
+        $scanCreatedDate = (Get-Date).ToString('yyyy/MM/dd HH:mm:ss')
+
         $RelativeFolder = $tempParentFolderCurrent.Replace($StartPath.ToLower(), "")
 		if ($global:SqlServer)
         {
             $createdValue = (Get-Date $Created).ToString('yyyy-MM-dd HH:mm:ss')
             $modifiedValue = (Get-Date $Modified).ToString('yyyy-MM-dd HH:mm:ss')
             $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro,"
-		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20) "
+		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20,ScanCreatedDate) "
 		    $query += " VALUES ('$FileName', '$createdValue', '$modifiedValue', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,"
-		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20')"
+		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20','$scanCreatedDate')"
         }
         else
         {
             $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro,"
-		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20) "
+		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20,ScanCreatedDate) "
 		    $query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,"
-		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20')"
+		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20','$scanCreatedDate')"
         }
 		
 		

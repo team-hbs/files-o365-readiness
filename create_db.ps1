@@ -146,7 +146,8 @@ $query = "  USE [" + $databaseName  + "]
                 [PathLength] [int] NULL,
                 [Error] [nvarchar](max) NULL,
                 [Size] [float] NULL,
-                [Ignore] [bit] NULL
+                [Ignore] [bit] NULL,
+				[ScanCreatedDate] [float] NULL
             PRIMARY KEY CLUSTERED 
             (
                 [Id] ASC
@@ -238,7 +239,8 @@ $query = "  USE [" + $databaseName + "]
                 [OfficeOpen] [bit] NULL,
                 [PathLength] [int] NULL,
                 [Error] [nvarchar](max) NULL,
-                [Size] [float] NULL
+                [Size] [float] NULL,
+				[ScanCreatedDate] [float] NULL
             ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
 
 SqlQueryInsert($query)

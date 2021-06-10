@@ -11,8 +11,7 @@
 	[string]$value = '',
     [int]$BatchNumber = -1,
     [int]$SourceId = -1,
-	[boolean]$encrypt = $false,
-	[string] $lastModifiedDate = $null
+	[boolean]$encrypt = $false
 )
 
 if ($email -eq $null)
@@ -650,7 +649,7 @@ elseif($mode -eq 'CleanUp')
         }
     }
 }
-elseif ($mode -eq "Scan") 
+elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan") 
 {
     if ($batchNumber -ne -1)
     {
@@ -679,7 +678,15 @@ elseif ($mode -eq "Scan")
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
             $ownerId = $row.Id
-			#$ownerId, $startPath, $doConvert, $noOffice)
+			if ($mode -eq "LastModifiedScan")
+			{
+				$query = "SELECT TOP 1 * FROM MigrationJob Where OwnerId = $ownerId ORDER BY CreatedDate DESC"
+				$migrationJob = SqlQueryReturn($query)
+				if ($migrationJob -ne $null)
+				{
+					$lastModifiedDate = $migrationJob.CreatedDate
+				}
+			}
 			if ($lastModifiedDate -eq $null)
 			{
 				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
@@ -714,6 +721,15 @@ elseif ($mode -eq "Scan")
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
+			if ($mode -eq "LastModifiedScan")
+			{
+				$query = "SELECT TOP 1 * FROM MigrationJob Where OwnerId = $ownerId ORDER BY CreatedDate DESC"
+				$migrationJob = SqlQueryReturn($query)
+				if ($migrationJob -ne $null)
+				{
+					$lastModifiedDate = $migrationJob.CreatedDate
+				}
+			}
 			if ($lastModifiedDate -eq $null)
 			{
 				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
