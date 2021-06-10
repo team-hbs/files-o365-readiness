@@ -613,12 +613,53 @@ elseif($mode -eq 'BatchReport')
 }
 elseif($mode -eq 'Delete')
 {
-
+    if ($batchNumber -ne -1)
+    {
+        $query = "SELECT * FROM Source WHERE BatchNumber = $batchNumber"
+        $sources = SqlQueryReturn($query)
+        foreach($source in $sources)
+        {
+            $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+            SqlQueryInsert $query
+			$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+            SqlQueryInsert $query
+            $query = "DELETE FROM Source WHERE Id = $ownerId"
+            SqlQueryInsert $query
+        }
+        $query = "DELETE FROM Batch WHERE BatchNumber = $batchNumber"
+        SqlQueryInsert $query
+    }
+    elseif($ownerId -ne -1)
+    {
+        $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+        SqlQueryInsert $query
+		$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+        SqlQueryInsert $query
+        $query = "DELETE FROM Source WHERE Id = $ownerId"
+        SqlQueryInsert $query
+    }
 }
 elseif($mode -eq 'Clear')
 {
-
-
+    if ($batchNumber -ne -1)
+    {
+        $query = "SELECT * FROM Source WHERE BatchNumber = $batchNumber"
+        $sources = SqlQueryReturn($query)
+        foreach($source in $sources)
+        {
+            $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+            SqlQueryInsert $query
+			$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+            SqlQueryInsert $query
+        }
+    }
+    elseif($ownerId -ne -1)
+    {
+        $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+        SqlQueryInsert $query
+		$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+        SqlQueryInsert $query
+    }
 }
 elseif($mode -eq 'CleanUp')
 {
