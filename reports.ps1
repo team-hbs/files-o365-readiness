@@ -99,7 +99,7 @@ function SqlQueryReturn($query) {
 }
 
 
-$sqlOverall = "SELECT Id, 
+$sqlOverall = "SELECT ScanJob.Id, 
 	SamAccountName,
 	ADHomeDirectory,
 	FileCountDisk,
