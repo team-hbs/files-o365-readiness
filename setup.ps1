@@ -1,10 +1,15 @@
+write-host 'Do not run this file!' -f Yellow
+Exit
+
+#unblock files
 set-executionpolicy unrestricted
 unblock-file -path .\pre_migration_master.ps1
 unblock-file -path .\crawl_v11.ps1
 unblock-file -path .\reports.ps1
+#install modules
 .\pre_migration_master.ps1 -mode 'Install' 
 
-<# Uncomment for SQL Server Mode
+<# For SQL Server Mode
 .\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseMode' -value 'SQLServer'
 .\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseServer' -value 'HBS-JBALDWIN01'
 .\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseName' -value 'Migration'
