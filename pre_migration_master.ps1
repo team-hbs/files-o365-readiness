@@ -604,21 +604,26 @@ elseif($mode -eq 'Clear')
     if ($batchNumber -ne -1)
     {
         $query = "SELECT * FROM Source WHERE BatchNumber = $batchNumber"
+		write-host $query -ForegroundColor Green
         $sources = SqlQueryReturn($query)
         foreach($source in $sources)
         {
 			$ownerId = $source.Id
             $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
 			$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
         }
     }
     elseif($ownerId -ne -1)
     {
         $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
 		$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
     }
 }
