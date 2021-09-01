@@ -18,7 +18,7 @@
 $commonPath = $PSScriptRoot + "\common.ps1"
 . $commonPath
 
-$crawlPath = $PSScriptRoot + "\crawl_v11.ps1"
+$crawlPath = $PSScriptRoot + "\crawl_v12.ps1"
 . $crawlPath
 
 if ($email -eq $null)
@@ -794,7 +794,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 elseif($mode -eq 'Install')
 {
 	unblock-file -path .\pre_migration_master.ps1
-	unblock-file -path .\crawl_v11.ps1
+	unblock-file -path .\crawl_v12.ps1
 	unblock-file -path .\create_db.ps1
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 	Install-Module -Name PSSQLite
