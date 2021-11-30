@@ -9,10 +9,17 @@
 	[string]$email,
 	[string]$key = '',
 	[string]$value = '',
-    [int]$BatchNumber = -1,
-    [int]$SourceId = -1,
+    [int]$batchNumber = -1,
+    [int]$sourceId = -1,
 	[boolean]$encrypt = $false
 )
+
+
+$commonPath = $PSScriptRoot + "\common.ps1"
+. $commonPath
+
+$crawlPath = $PSScriptRoot + "\crawl_v12.ps1"
+. $crawlPath
 
 if ($email -eq $null)
 {
@@ -119,48 +126,6 @@ $username = "heartlandpowershellscripts@gmail.com"
 $password = ConvertTo-SecureString -String "heartland123" -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $username, $password
 
-
-  
-
-function SqlQueryInsert($query) {
-    write-host $query -f Yellow
-	$null = @(
-		if ($global:SqlServer) {
-			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
-			$SqlCmd.CommandText = $query
-      
-			$SqlCmd.Connection = $global:SqlConnection
-			if ($global:SqlConnection.State -ne 1)
-			{
-				$global:SqlConnection.Open()
-			}
-			$SqlCmd.ExecuteNonQuery()
-			$global:SqlConnection.Close()
-
-		} else {
-			Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-		}
-	)
-}
-
-function SqlQueryReturn($query) {
-	if ($global:SqlServer) {
-		$DataTable = $null
-		$null = @(
-			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
-			$SqlCmd.CommandText = $query
-			$SqlCmd.Connection = $global:SqlConnection
-			$SqlAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-			$SqlAdapter.SelectCommand = $SqlCmd
-			$DataSet = New-Object System.Data.DataSet
-			$SqlAdapter.Fill($DataSet)
-			$DataTable = $DataSet.Tables[0]
-		)
-		return $DataTable
-	} else {
-		return Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	}
-}
 
 function AddEvent($ownerId, $eventType)
 {
@@ -552,12 +517,7 @@ function GetImportFile($startsIn)
         $fileName = $OpenFileDialog.filename
     )
     return $fileName
-} 
-
-
-# Create the path to the crawl script and run it
-$crawlPath = $PSScriptRoot + "\crawl_v11.ps1"
-. $crawlPath
+}
 
 
 if ($mode -eq "single") 
@@ -644,20 +604,26 @@ elseif($mode -eq 'Clear')
     if ($batchNumber -ne -1)
     {
         $query = "SELECT * FROM Source WHERE BatchNumber = $batchNumber"
+		write-host $query -ForegroundColor Green
         $sources = SqlQueryReturn($query)
         foreach($source in $sources)
         {
+			$ownerId = $source.Id
             $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
 			$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
         }
     }
     elseif($ownerId -ne -1)
     {
         $query = "DELETE FROM ScanFile WHERE OwnerId = $ownerId"
+		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
 		$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
     }
 }
@@ -828,7 +794,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 elseif($mode -eq 'Install')
 {
 	unblock-file -path .\pre_migration_master.ps1
-	unblock-file -path .\crawl_v11.ps1
+	unblock-file -path .\crawl_v12.ps1
 	unblock-file -path .\create_db.ps1
 	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 	Install-Module -Name PSSQLite

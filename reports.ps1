@@ -4,6 +4,9 @@ param (
 )
 
 
+$commonPath = $PSScriptRoot + "\common.ps1"
+. $commonPath
+
 if ((Get-Module -ListAvailable -Name PSSQLite) -ne $null) {
     Import-Module -Name PSSQLite
 } 
@@ -76,28 +79,6 @@ if ((GetConfig 'DatabaseMode') -eq 'SQLServer')
 	$global:SqlConnection.ConnectionString = $connectionString
 	$global:SqlServer = $true
 }
-
-
-function SqlQueryReturn($query) {
-	write-host $query -f Yellow
-	if ($global:SqlServer) {
-		$DataTable = $null
-		$null = @(
-			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
-			$SqlCmd.CommandText = $query
-			$SqlCmd.Connection = $global:SqlConnection
-			$SqlAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-			$SqlAdapter.SelectCommand = $SqlCmd
-			$DataSet = New-Object System.Data.DataSet
-			$SqlAdapter.Fill($DataSet)
-			$DataTable = $DataSet.Tables[0]
-		)
-		return $DataTable
-	} else {
-		return Invoke-SqliteQuery -Query $query -DataSource $global:DataSource
-	}
-}
-
 
 $sqlOverall = "SELECT ScanJob.Id, 
 	SamAccountName,
