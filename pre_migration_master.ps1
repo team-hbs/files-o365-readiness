@@ -696,10 +696,14 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			}
 			if ($lastModifiedDate -eq $null)
 			{
+				#start office monitor
+                OfficeMonitor
 				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
 			}
 			else
 			{
+			    #start office monitor
+                OfficeMonitor
 				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
 			}
             $currentDirectory++

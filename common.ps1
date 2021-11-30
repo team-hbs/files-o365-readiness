@@ -109,6 +109,27 @@ function SqlQueryReturn($query) {
 	}
 }
 
+
+function OfficeMonitor()
+{
+    #start office monitor if it is not already running
+    $noOfficeConfig = GetConfig 'NoOffice'
+    if ($noOfficeConfig -eq 'false')
+    {
+        $officeMonitorConfig = GetConfig 'OfficeMonitor'
+        if ($officeMonitorConfig -eq 'true')
+        {
+            $OfficeMonitor = get-process | where-object {$_.MainWindowTitle -eq 'OfficeMonitor'}
+            if ($OfficeMonitor -eq $null)
+            {
+                write-host 'OfficeMonitor Not Running, Starting New Process...' -f Cyan
+                $expression = "c:\windows\system32\cmd.exe /c start powershell -version 5 -Command { $PSScriptRoot\officemonitor.ps1 }"
+                invoke-expression $expression
+            }
+        }
+    }
+}
+
 function AddEvent($ownerId, $eventType)
 {
 	$eventDate = Get-Date
