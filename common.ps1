@@ -74,8 +74,10 @@ function SetConfig($key, $value, $encrypted)
 function SqlQueryInsert($query) {
 	$null = @(
 		if ($global:SqlServer) {
+            #write-host $query -f Yellow
 			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
 			$SqlCmd.CommandText = $query
+            $SqlCmd.CommandTimeout = 60
 			$SqlCmd.Connection = $global:SqlConnection
 			if ($global:SqlConnection.State -ne 1)
 			{
@@ -94,8 +96,10 @@ function SqlQueryReturn($query) {
 	if ($global:SqlServer) {
 		$DataTable = $null
 		$null = @(
+       write-host $query -f Cyan
 			$SqlCmd = New-Object System.Data.SqlClient.SqlCommand
 			$SqlCmd.CommandText = $query
+            $SqlCmd.CommandTimeout = 60
 			$SqlCmd.Connection = $global:SqlConnection
 			$SqlAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 			$SqlAdapter.SelectCommand = $SqlCmd

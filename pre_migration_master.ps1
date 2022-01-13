@@ -14,6 +14,7 @@
 	[boolean]$encrypt = $false
 )
 
+$global:LinkCounter = 0
 
 $commonPath = $PSScriptRoot + "\common.ps1"
 . $commonPath
@@ -667,7 +668,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 	    Write-Host "Query:" $query -ForegroundColor Green
         $source = SqlQueryReturn($query)
         $directoriesCount = ($source | Measure-Object).Count
-	    $currentDirectory = 0
+	    $currentDirectory = 1
 		
 		$noOfficeValue = [String] (GetConfig('NoOffice') )
 		if ($noOfficeValue -eq 'true')
@@ -702,9 +703,21 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			}
 			else
 			{
-			    #start office monitor
-                OfficeMonitor
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
+                $scanJobQuery = "SELECT * FROM ScanJob WHERE OwnerId = $ownerId"
+                Write-Host "ScanJob Query:" $query -ForegroundColor White
+                $scanJob = SqlQueryReturn($scanJobQuery)
+                if ($scanJob -eq $null)
+                {
+    	            #Write-Host "Query:" $query -ForegroundColor Green
+                    #$source = SqlQueryReturn($query)
+			        #start office monitor
+                    OfficeMonitor
+				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
+                }
+                else
+                {
+                    write-host "Skipping $source.ADHomeDirectory" -f Yellow
+                }
 			}
             $currentDirectory++
         }   
@@ -716,8 +729,8 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 				WHERE Source.Id = $ownerId"
 	    Write-Host "Query:" $query -ForegroundColor Green
 	    $source = SqlQueryReturn($query)
-        $directoriesCount = ($source | Measure-Object).Count
-	    $currentDirectory = 0
+        $directoriesCount = $source.Length #($source | Measure-Object).Count
+	    $currentDirectory = 1
 		$noOfficeValue = [String] (GetConfig('NoOffice') )
 		if ($noOfficeValue -eq 'true')
 		{
@@ -787,12 +800,12 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 	$makeLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
 	$uploadLocation = "https://migrationstoragehbstemp.blob.core.windows.net/scans/" + $computerName + "/" + $timestamp + "/?sv=2020-02-10&ss=bfqt&srt=sco&sp=rwdlacupx&se=2022-03-27T04:23:01Z&st=2021-03-26T20:23:01Z&spr=https&sig=xsQFrHErUapJLzQzFQ7w%2BTjyARMo5vXE1iYgr01ZcDU%3D"
 	
-	$makeString = "azcopy make ""$makeLocation"""
-	Write-Host $makeString
+	#$makeString = "azcopy make ""$makeLocation"""
+	#Write-Host $makeString
 	#Invoke-Expression $makeString
 	
-	$uploadString = "azcopy copy ""$PSScriptRoot\FilesToO365.db"" ""$uploadLocation"""
-	Write-Host $uploadString
+	#$uploadString = "azcopy copy ""$PSScriptRoot\FilesToO365.db"" ""$uploadLocation"""
+	#Write-Host $uploadString
 	#Invoke-Expression $uploadString
 }
 elseif($mode -eq 'Install')
@@ -877,6 +890,23 @@ elseif($mode -eq 'CreateDatabase')
 	{
 		write-host 'Cannot Create Database in SQLite Mode' -f Yellow
 	}
+}
+elseif($mode -eq "CollectLinks")
+{
+    if ($batchNumber -ne -1)
+    {
+        $query = "SELECT * FROM Source WHERE BatchNumber = $batchNumber"
+    }
+    else
+    {
+        $query = "SELECT * FROM Source WHERE OwnerId = $ownerId"
+    }
+    $result = SqlQueryReturn $query
+    foreach($row in $result)
+    {
+        $ownerId = $row.Id
+        CollectDocumentLinks2 -ownerId $ownerId 
+  }
 }
 elseif ($mode -eq "ClearDatabase") 
 {

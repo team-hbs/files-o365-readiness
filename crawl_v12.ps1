@@ -201,6 +201,217 @@ function CrawlFolder($path, $ownerId, $currentDepth)
     }
 }
 
+
+
+function CollectDocumentLinks2($ownerId)
+{
+	#query scanfile
+	$query = "SELECT * FROM ScanFile WHERE OwnerId = $ownerId AND HasLink = 1"
+	$result = SqlQueryReturn $query
+    write-host 'Found' $result.Length 'Documents'
+	foreach($row in $result)
+	{
+        $global:LinkCounter++
+        $extension = $row.Extension
+        $filePath = $row.Path + "\"  + $row.FileName
+        $fileId = $row.Id
+        $replaceExtension = $extension
+        if ($extension -eq 'doc' -OR $extension -eq 'docx') 
+        {
+            try
+            {
+                [gc]::collect()
+                [gc]::WaitForPendingFinalizers()
+                $global:word = new-object -comobject word.application
+                $global:word.Visible = $False
+                $global:word.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.Word.WdAlertLevel],"wdAlertsNone")
+                $global:word.AutomationSecurity = 'msoAutomationSecurityForceDisable'
+                write-host 'Opening:' $filePath
+                $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
+                write-host $global:LinkCounter 'Hyperlinks:' $opendoc.Hyperlinks.Count
+                if ($opendoc.Hyperlinks.Count -gt 0)
+                {
+                    write-host 'FOUND WORD LINKS' -f WHITE
+                    foreach($hyperlink in $opendoc.Hyperlinks)
+                    {
+                        $url = $hyperlink.Address
+                        $created = Get-Date
+                        if ($url -ne $null -AND $url.Trim() -ne '')
+                        {
+                            write-host 'LINK:' $url -f Cyan
+                            $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$url',$ownerId,$fileId,'$created')"
+                            write-host $query
+                            SqlQueryInsert -query $query
+                        }
+                    }
+                }
+            }
+            catch
+            {
+               write-host $_.Exception.Message -f Yellow
+            }
+            if ($openDoc -ne $null)
+            {
+                $opendoc.close($false)
+            }
+            Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+        }  
+        elseif ($extension -eq 'xls' -OR $extension -eq 'xlsx') 
+        {
+            try
+            {
+                [gc]::collect()
+                [gc]::WaitForPendingFinalizers()
+                $global:excel = new-object -comobject excel.application
+                $global:excel.Visible = $False
+                $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
+                $global:excel.DisplayAlerts = $False;
+                $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
+                $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
+                foreach($worksheet in $workBook.worksheets)
+                {
+                    if ($worksheet.Hyperlinks.Count -gt 0)
+                    {
+                        write-host 'Found EXCEL links' -f white
+                        foreach($hyperlink in $worksheet.Hyperlinks)
+                        {
+                            $url = $hyperlink.Address
+                            $created = Get-Date
+                            if ($url -ne $null -AND $url.Trim() -ne '')
+                            {
+                                write-host 'LINK:' $url -f Cyan
+                                $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$url',$ownerId,$fileId,'$created')"
+                                write-host $query
+                                SqlQueryInsert -query $query
+                            }
+                        }
+                    }
+                }
+            }
+            catch
+            {
+               write-host $_.Exception.Message -f Yellow
+            }
+            if ($workbook -ne $null)
+            {
+                $workBook.close($false);
+            }
+            Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+        }
+        elseif ($extension -eq 'ppt' -OR $extension -eq 'pptx') 
+        {
+            try
+            {
+                [gc]::collect()
+                [gc]::WaitForPendingFinalizers()
+                $global:powerpoint = New-Object -ComObject PowerPoint.application
+                $global:powerpointSaveFormat = [Microsoft.Office.Interop.PowerPoint.PpSaveAsFileType]::ppSaveAsOpenXMLPresentation 
+                $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
+                $global:powerpoint.AutomationSecurity = 'msoAutomationSecurityForceDisable'
+
+                $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
+                foreach($slide in $presentation.Slides)
+                {
+                    if ($slide.Hyperlinks.Count -gt 0)
+                    {
+                        write-host 'Found powerpoint link' -f white
+                        $hasLinks = $true
+                        $url = $hyperlink.Address
+                        $created = Get-Date
+                        if ($url -ne $null -AND $url.Trim() -ne '')
+                        {
+                            write-host 'LINK:' $url -f Cyan
+                            $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$url',$ownerId,$fileId,'$created')"
+                            write-host $query
+                            SqlQueryInsert -query $query
+                        }
+                    }
+                }
+                if ($presentation -ne $null)
+                {
+                    $presentation.close()
+                }
+            }
+            catch
+            {
+               write-host $_.Exception.Message -f Yellow
+            }
+            Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+        }
+    } 
+}
+
+function CollectDocumentLinks($ownerId)
+{
+	#query scanfile
+	$query = "SELECT * FROM ScanFile WHERE OwnerId = $ownerId AND HasLink = 1"
+	$result = SqlQueryReturn $query
+   
+	foreach($row in $result)
+	{
+        $extension = $row.Extension
+        $filePath = $row.Path + "\"  + $row.FileName
+        $replaceExtension = $extension
+        if ($extension -eq 'doc' -OR $extension -eq 'docx') 
+        {
+            try 
+            {
+                #write-host 'Inspecting:' $filePath
+                # Assemble paths
+                $arrPath = $filePath.Split('\')
+                $filename = $arrPath[$arrPath.Length - 1].ToLower().Replace(".$extension", '')
+                $newFolder = "$PSScriptRoot\temp\$filename"
+                $copyPath = "$newFolder\$filename.$extension"
+                $zipPath = "$newFolder\$filename.zip"
+
+                # Create temp folder
+                if ((Test-Path -Path $newFolder) -eq $false) 
+                {
+                    New-Item -ItemType directory -Path $newFolder
+                }
+
+                # Make a copy of the file to work on
+                Copy-Item $filePath -Destination $newFolder
+    
+                #Write-Host 'Renaming docx to zip'
+                Rename-Item -Path $copyPath -NewName "$filename.zip" -Force
+                Write-Host 'Unzipping Word document'
+                Expand-Archive -LiteralPath $zipPath -DestinationPath $newFolder -Force
+
+                #[xml]$xmlDoc = Get-Content "$newFolder\word\document.xml"
+                [xml]$xmlDoc = Get-Content "$newFolder\word\_rels\document.xml.rels"
+                #$nodes = $xmlDoc | Select-Xml -Xpath "//*[name()='w:hyperlink']"
+                $nodes = $xmlDoc | Select-Xml -Xpath "//*[name()='Relationship']"
+                $global:xmlDoc = $xmlDoc
+                if($nodes -ne $null) 
+                {
+                    #Write-Host "REFERENCED LINKS FOUND"
+				    foreach($node in $nodes)
+                    {
+                        if ($node.Node.TargetMode -eq 'External')
+                        {
+                            $url = $node.Node.Target
+                            $created = Get-Date
+                            write-host 'LINK:' $node.Node.Target -f Cyan
+                            $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$url',$ownerId,$fileId,'$created')"
+                            SqlQueryInsert -query $query
+                        }
+                    }
+                } 
+                else
+                {
+                    #Write-Host "NO EMBEDDED LINKS FOUND" -f Yellow
+                }
+                Write-Host "Removing temp copy" $newFolder
+                Remove-Item $newFolder -Recurse
+            } 
+            catch 
+            {
+                Write-Host "Error checking links" -f Yellow
+            }
+        }  
+    } 
+}
 #function InsertUserEntry($email, $ownerId, $fileCount, $fileSize, $errorCount)
 function InsertUserEntry($ownerId, $fileCount, $fileSize, $errorCount)
 {
@@ -220,7 +431,7 @@ function InsertUserEntry($ownerId, $fileCount, $fileSize, $errorCount)
            $query = "INSERT INTO  $filesUsersTableName  (OwnerId,FileCountDisk,FileSizeDisk,ErrorCount,CreatedDate) VALUES ($ownerId,$fileCount,$fileSize,$errorCount,$created)"
         }
         
-        #write-host "Query:" $query -ForegroundColor Green 	   
+        write-host "Query:" $query -ForegroundColor Green 	   
 	    SqlQueryInsert($query)
     }
 	catch
@@ -254,9 +465,11 @@ function ConvertDocument($path, $file, $saveAs)
 	$converted = $false
 	$message = ""
     $oldFormat = $false
+    $hasLinks = $false
 	try
 	{
-		if ($extension -eq "doc")
+       
+		if ($extension -eq "doc" -OR $extension -eq "docx")
 		{
             $oldFormat = $true
             if ($noOffice) {
@@ -275,90 +488,111 @@ function ConvertDocument($path, $file, $saveAs)
                     $global:word.AutomationSecurity = 'msoAutomationSecurityForceDisable'
 					#$global:word.AutoRecover.Enabled = $false
                 }
-                
-                $testFilePath = $filePath + "x"
-                if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                if ($extension -eq "docx")
                 {
-                
-                    #$savename = $filePath.ToLower() -replace ".doc", ".docx"
-                    $savename = $filePath.ToLower() + 'x'
-                    #copy to local location
-                    Write-Host "opening:" $filePath  
-					if ($doConvert)
-					{
-						write-host "Saving as :" $savename -ForegroundColor Cyan
-					}
-                    try
-                    {			    
-                        #$opendoc = $global:word.documents.open($filePath,$false,$true)
-                        #new 7/27/19
-                        #$opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true)
-                        #new 2/5/21
-                        $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
-				
-                        if ($saveAs -eq $true -AND $opendoc -ne $null)
-                        {
-                            $opendoc.saveas([ref]"$savename", [ref]$global:wordSaveFormat);
-                            $converted = $true
-                        }
-						$opendoc.close($false)
-                        if ($opendoc -eq $null)
-                        {
-                            write-host "DOC IS NULL" -ForegroundColor yellow
-                            throw "Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"
-                        }
-                    }
-                    catch
+                    $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
+                    if ($opendoc.Hyperlinks.Count -gt 0)
                     {
-                        if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
-                        {
-                            $tempFilePath = "c:\temp\" + $name
-                        
-                            $tempSaveName = $tempFilePath.ToLower() + 'x'
-                            #copy to local location
-                            Copy-Item $filePath -Destination $tempFilePath
-                            #$opendoc = $global:word.documents.open($tempFilePath,$false,$true)
-                            #new 7/27/19
-                            #$opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true)
-                            #new 2/5/21
-                            $opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true,$false,'')
-							
-                            if ($saveAs)
-                            {
-                                $opendoc.saveas([ref]"$tempSaveName", [ref]$global:wordSaveFormat);
-                            }
-                            $opendoc.close($false);
-                            $newTempFilePath =  "c:\temp\" + $name  + "x" 
-                            #copy back to original location
-                            if ($saveAs -eq $true)
-                            {
-                                Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
-                            }
-                            Remove-Item -Path $tempFilePath 
-                            if ($saveAs -eq $true)
-                            {
-                                Remove-Item -Path $newTempFilePath 
-                            }
-                            $converted = $true
-                        }
-                        else
-                        {
-                            throw $_
-                        }
-
+                        $hasLinks = $true
+                        write-host 'FOUND WORD LINK' -f WHITE
                     }
-                    finally
-                    {
-                        Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
-                    }
+                    $opendoc.close($false)
                 }
-                else
+                elseif ($extension -eq "doc")
                 {
-                    $oldFormat = $false
+                    $testFilePath = $filePath + "x"
+                    if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                    {
+                        #$savename = $filePath.ToLower() -replace ".doc", ".docx"
+                        $savename = $filePath.ToLower() + 'x'
+                        #copy to local location
+                        Write-Host "opening:" $filePath  
+					    if ($doConvert)
+					    {
+						    write-host "Saving as :" $savename -ForegroundColor Cyan
+					    }
+                        try
+                        {			    
+                            #$opendoc = $global:word.documents.open($filePath,$false,$true)
+                            #new 7/27/19
+                            #$opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true)
+                            #new 2/5/21
+                            $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
+                            write-host 'HYPERLINK COUNT:' 	$opendoc.Hyperlinks.Count			        
+                            if ($opendoc.Hyperlinks.Count -gt 0)
+                            {
+                                $hasLinks = $true
+                                write-host 'FOUND WORD LINK' -f WHITE
+                            }
+
+                            if ($saveAs -eq $true -AND $opendoc -ne $null)
+                            {
+                                $opendoc.saveas([ref]"$savename", [ref]$global:wordSaveFormat);
+                                $converted = $true
+                            }
+						    $opendoc.close($false)
+                            if ($opendoc -eq $null)
+                            {
+                                write-host "DOC IS NULL" -ForegroundColor yellow
+                                throw "Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"
+                            }
+                        }
+                        catch
+                        {
+                            if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                            {
+                                $tempFilePath = "c:\temp\" + $name
+                        
+                                $tempSaveName = $tempFilePath.ToLower() + 'x'
+                                #copy to local location
+                                Copy-Item $filePath -Destination $tempFilePath
+                                #$opendoc = $global:word.documents.open($tempFilePath,$false,$true)
+                                #new 7/27/19
+                                #$opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true)
+                                #new 2/5/21
+                                $opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true,$false,'')
+                                write-host 'HYPERLINK COUNT:' 	$opendoc.Hyperlinks.Count	-f Cyan
+							    if ($opendoc.Hyperlinks.Count -gt 0)
+                                {
+                                    $hasLinks = $true
+                                    write-host 'FOUND WORD LINK' -f WHITE
+                                }
+                                if ($saveAs)
+                                {
+                                    $opendoc.saveas([ref]"$tempSaveName", [ref]$global:wordSaveFormat);
+                                }
+                                $opendoc.close($false);
+                                $newTempFilePath =  "c:\temp\" + $name  + "x" 
+                                #copy back to original location
+                                if ($saveAs -eq $true)
+                                {
+                                    Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
+                                }
+                                Remove-Item -Path $tempFilePath 
+                                if ($saveAs -eq $true)
+                                {
+                                    Remove-Item -Path $newTempFilePath 
+                                }
+                                $converted = $true
+                            }
+                            else
+                            {
+                                throw $_
+                            }
+                        }
+                        finally
+                        {
+                            Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+                        }
+                    }
+                    else
+                    {
+                        $oldFormat = $false
+                    }
                 }
             }
 		}
-		elseif ($extension -eq "xls")
+		elseif ($extension -eq "xls" -OR $extension -eq 'xlsx')
 		{
             $oldFormat = $true
             if ($noOffice) 
@@ -378,56 +612,81 @@ function ConvertDocument($path, $file, $saveAs)
                     $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
 					#$global:excel.AutoRecover.Enabled = $false
                 }
-                $testFilePath = $filePath + "x"
-                if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                if ($extension -eq "xlsx")
                 {
-                    try
+                  $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
+                    foreach($worksheet in $workBook.worksheets)
                     {
-                        $savename = $filePath.ToLower() + 'x'
-                        $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
-						
-                        if ($workbook.HasVBProject)
+                        if ($worksheet.Hyperlinks.Count -gt 0)
                         {
-                            $result.HasMacro = $true
-							if ($saveAs -eq $true)
-                            {
-								$savename = $savename -Replace ".xlsx", ".xlsm"
-								$workBook.saveas([ref]"$savename", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
-							}
+                            write-host 'Found EXCEL link' -f white
+                            $hasLinks = $true
                         }
-                        else
-                        {
-							if ($saveAs -eq $true)
-                            {
-                                $workBook.saveas([ref]"$savename", [ref]$global:excelSaveFormat);
-                            }
-                        }
-                        $workBook.close($false);
-                        $converted = $true
+                         
                     }
-                    catch
+                    $workBook.close($false);
+                }
+                elseif ($extension -eq "xls")
+                {
+                    $testFilePath = $filePath + "x"
+                    if ([System.IO.File]::Exists($testFilePath) -eq $false)
                     {
-                        if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                        try
                         {
-                            $tempFilePath = "c:\temp\" + $name
-                            #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
-                            $tempSaveName = $tempFilePath.ToLower() + 'x'
-                            #copy to local location
-                            Copy-Item $filePath -Destination $tempFilePath
+                            $savename = $filePath.ToLower() + 'x'
                             $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
-
+						    foreach($worksheet in $workBook.worksheets)
+                            {
+                                if ($worksheet.Hyperlinks.Count -gt 0)
+                                {
+                                    $hasLinks = $true
+                                }
+                            }
                             if ($workbook.HasVBProject)
                             {
                                 $result.HasMacro = $true
-								if ($saveAs -eq $true)
-								{
-									$tempSaveName = $tempSaveName -Replace ".xlsx", ".xlsm"
-									$workBook.saveas([ref]"$tempSaveName", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
-								}
+							    if ($saveAs -eq $true)
+                                {
+    								$savename = $savename -Replace ".xlsx", ".xlsm"
+								    $workBook.saveas([ref]"$savename", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+							    }
                             }
                             else
                             {
-                                if ($saveAs -eq $true)
+							    if ($saveAs -eq $true)
+                                {
+                                    $workBook.saveas([ref]"$savename", [ref]$global:excelSaveFormat);
+                                }
+                            }
+                            $workBook.close($false);
+                            $converted = $true
+                        }
+                        catch
+                        {
+                            if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                            {
+                                $tempFilePath = "c:\temp\" + $name
+                                #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
+                                $tempSaveName = $tempFilePath.ToLower() + 'x'
+                                #copy to local location
+                                Copy-Item $filePath -Destination $tempFilePath
+                                $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
+                                if ($worksheet.Hyperlinks.Count -gt 0)
+                                {
+                                    $hasLinks = $true
+                                }
+                                if ($workbook.HasVBProject)
+                                {
+                                    $result.HasMacro = $true
+								    if ($saveAs -eq $true)
+								    {
+									    $tempSaveName = $tempSaveName -Replace ".xlsx", ".xlsm"
+									    $workBook.saveas([ref]"$tempSaveName", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+								    }
+                                }
+                                else
+                                {
+                                    if ($saveAs -eq $true)
                                 {
                                     $workBook.saveas([ref]"$tempSaveName", [ref]$global:excelSaveFormat);
                                 }
@@ -460,9 +719,10 @@ function ConvertDocument($path, $file, $saveAs)
                 {
                     $oldFormat = $false
                 }
+                }
             }
 		}
-		elseif ($extension -eq "ppt")
+		elseif ($extension -eq "ppt" -OR $extension -eq 'pptx')
 		{
             $oldFormat = $true
             if ($noOffice)
@@ -481,61 +741,90 @@ function ConvertDocument($path, $file, $saveAs)
                     $global:powerpoint.AutomationSecurity = 'msoAutomationSecurityForceDisable'
 
                 }
-                $testFilePath = $filePath + "x"
-                if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                if ($extension -eq 'pptx')
                 {
-                    try
+                   $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
+                   foreach($slide in $presentation.Slides)
+                   {
+                    if ($slide.Hyperlinks.Count -gt 0)
                     {
-                        $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
-                        #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
-                        $savename = $filePath.ToLower() + 'x'
-
-                        if ($saveAs -eq $true)
-                        {
-                            $presentation.saveas([ref]"$savename", [ref]$global:powerpointSaveFormat);
-                        }
-                        $presentation.close();
-                        $converted = $true
+                        write-host 'Found powerpoint link' -f white
+                        $hasLinks = $true
                     }
-                    catch
+                   }
+                   $presentation.close()
+                }
+                elseif ($extension -eq 'ppt')
+                {
+                    $testFilePath = $filePath + "x"
+                    if ([System.IO.File]::Exists($testFilePath) -eq $false)
                     {
-                        if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                        try
                         {
-                            $tempFilePath = "c:\temp\" + $name
-                            #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
-                            $tempSaveName = $tempFilePath.ToLower() + 'x'
-                            #copy to local location
-                            Copy-Item $filePath -Destination $tempFilePath
-                            $presentation = $global:powerpoint.Presentations.open("$tempFilePath::password::", $true, $null, $false)
+                            $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
+                            #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
+                            $savename = $filePath.ToLower() + 'x'
+                            foreach($slide in $presentation.Slides)
+                            {
+                                if ($slide.Hyperlinks.Count -gt 0)
+                                {
+                                    $hasLinks = $true
+                                }
+                            }
                             if ($saveAs -eq $true)
                             {
-                                $presentation.saveas([ref]"$tempSaveName", [ref]$global:powerpointSaveFormat);
+                                $presentation.saveas([ref]"$savename", [ref]$global:powerpointSaveFormat);
                             }
                             $presentation.close();
-                            if ($saveAs -eq $true)
-                            {
-                                Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
-                            }
-                            Remove-Item -Path $tempFilePath 
-                            if ($saveAs)
-                            {
-                                Remove-Item -Path $newTempFilePath 
-                            }
                             $converted = $true
                         }
-                        else
+                        catch
                         {
-                            throw $_
+                            if ($_.Exception.Message.StartsWith("Sorry, we couldn't find your file. Was it moved, renamed, or deleted?"))
+                            {
+                                $tempFilePath = "c:\temp\" + $name
+                                #$tempSaveName  = ($tempFilePath).substring(0,($tempFilePath).lastindexOf("."))
+                                $tempSaveName = $tempFilePath.ToLower() + 'x'
+                                #copy to local location
+                                Copy-Item $filePath -Destination $tempFilePath
+                                $presentation = $global:powerpoint.Presentations.open("$tempFilePath::password::", $true, $null, $false)
+                                foreach($slide in $presentation.Slides)
+                                {
+                                    if ($slide.Hyperlinks.Count -gt 0)
+                                    {
+                                        $hasLinks = $true
+                                    }
+                                }
+                                if ($saveAs -eq $true)
+                                {
+                                    $presentation.saveas([ref]"$tempSaveName", [ref]$global:powerpointSaveFormat);
+                                }
+                                $presentation.close();
+                                if ($saveAs -eq $true)
+                                {
+                                    Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
+                                }
+                                Remove-Item -Path $tempFilePath 
+                                if ($saveAs)
+                                {
+                                    Remove-Item -Path $newTempFilePath 
+                                }
+                                $converted = $true
+                            }
+                            else
+                            {
+                                throw $_
+                            }
+                        }
+                        finally
+                        {
+                            Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
                         }
                     }
-                    finally
+                    else
                     {
-                        Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+                        $oldFormat = $false
                     }
-                }
-                else
-                {
-                    $oldFormat = $false
                 }
             }
         }
@@ -697,7 +986,7 @@ function ConvertDocument($path, $file, $saveAs)
 
     }
     #>
-    
+    $result.HasLink = $hasLinks
     return $result
 }
 
@@ -724,7 +1013,7 @@ function UpdateExtensions($ownerId)
 	catch
 	{
     	$line = $_.InvocationInfo.ScriptLineNumber
-		$message = $line + " " + $_.Exception.Message
+		$message = ([string] $line) + " " + $_.Exception.Message
 		write-error $message
         $global:currentErrorCount++
         New-Object -TypeName PsObject -Property @{FileName="UpdateExtensions";Message=$message;Path="";Query=""}

@@ -1,5 +1,5 @@
 ﻿$hashOffices = @{}
-$lifetimeLimit = 4
+$lifetimeLimit = 2
  
 $Host.UI.RawUI.WindowTitle = 'OfficeMonitor'
  
@@ -28,26 +28,34 @@ while($true)
             if ($minutes -gt $lifetimeLimit)
             {
                 write-host ''
-                write-host 'Stopping Process' $tempItem.Name 'Id' $tempItem.Id  $now -f Yellow
+                write-host 'Stopping Process' $tempItem.Name 'Id' $app.Id '|' + $tempItem.Id "Minutes" $minutes -f Yellow
                 Stop-Process -Id $app.Id  -Confirm:$false -PassThru
                 $hashOffices.Remove($app.Id)
             }
         }
     }
     #cleanup processes that closed on their own
+    $removeIds = @()
     foreach($id in $hashOffices.Keys)
     {
         $tempItem = $hashOffices[$id]
         $runningSince = $tempItem.RunningSince
-        $minutes = ($now - $runningSince).TotalMinutes
-        if ($minutes -gt ($lifetimeLimit + 10))
-        {
+        #$minutes = ($now - $runningSince).TotalMinutes
+        #if ($minutes -gt ($lifetimeLimit + 10))
+        #{
             $office = get-process | Where-object {$_.Id -like $id}
             if ($office -eq $null)
             {
-                $hashOffices.Remove($tempItem.Id)
+                #log ids because we can't modify collection while enumerating
+                $removeIds = $removeIds + ([string] $tempItem.Id)
+                #$hashOffices.Remove($tempItem.Id)
             }
-        }
+        #}
+    }
+    foreach($id in $removeIds)
+    {
+        write-host 'Cleaning Up Id' $id -f Green
+        $hashOffices.Remove([Int] $id)
     }
     write-host '.' -NoNewline
     Start-Sleep -seconds 10

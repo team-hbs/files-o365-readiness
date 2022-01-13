@@ -5,7 +5,10 @@ Exit
 set-executionpolicy unrestricted
 unblock-file -path .\pre_migration_master.ps1
 unblock-file -path .\crawl_v11.ps1
+unblock-file -path .\common.ps1
+unblock-file -path .\installAzCopy.ps1
 unblock-file -path .\reports.ps1
+unblock-file -path .\OfficeMonitor.ps1
 #install modules
 .\pre_migration_master.ps1 -mode 'Install' 
 
