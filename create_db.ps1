@@ -111,8 +111,8 @@ $query = "  USE [" + $databaseName  + "]
                 [Id] [int] IDENTITY(1,1) NOT NULL,
                 [FileName] [nvarchar](max) NULL,
                 [Location] [nvarchar](max) NULL,
-                [Created] [float] NULL,
-                [Modified] [float] NULL,
+                [Created] [datetime] NULL,
+                [Modified] [datetime] NULL,
                 [Author] [nvarchar](max) NULL,
                 [Extension] [nvarchar](max) NULL,
                 [Folder01] [nvarchar](max) NULL,
@@ -148,7 +148,7 @@ $query = "  USE [" + $databaseName  + "]
                 [Error] [nvarchar](max) NULL,
                 [Size] [float] NULL,
                 [Ignore] [bit] NULL,
-				[ScanCreatedDate] [float] NULL
+				[ScanCreatedDate] [datetime] NULL
             PRIMARY KEY CLUSTERED 
             (
                 [Id] ASC
@@ -186,7 +186,7 @@ $query = "  USE [" + $databaseName  + "]
                 [ApiErrorCount] [int] NULL,
                 [ApiReportPath] [nvarchar](max) NULL,
                 [NoAccessCount] [int] NULL,
-                [CreatedDate] [float] NULL
+                [CreatedDate] [datetime] NULL
             PRIMARY KEY CLUSTERED 
             (
                 [OwnerId] ASC
@@ -243,7 +243,7 @@ $query = "  USE [" + $databaseName + "]
                 [PathLength] [int] NULL,
                 [Error] [nvarchar](max) NULL,
                 [Size] [float] NULL,
-				[ScanCreatedDate] [float] NULL
+				[ScanCreatedDate] [datetime] NULL
             ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
 
 SqlQueryInsert($query)
@@ -371,3 +371,23 @@ $query = "  USE [" + $databaseName + "]
             ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
 
 SqlQueryInsert($query)
+
+$query = "  USE [" + $databaseName + "]
+
+            /****** Object:  Table [dbo].[MigrationJob]    Script Date: 8/4/2020 11:52:09 AM ******/
+            SET ANSI_NULLS ON
+
+            SET QUOTED_IDENTIFIER ON
+
+CREATE TABLE [dbo].[ScanLink](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
+	[OwnerId] [int] NULL,
+	[FileId] [int] NULL,
+	[Url] [nvarchar](max) NULL,
+	[Created] [datetime2](7) NULL
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+"
+
+SqlQueryInsert($query)
+
