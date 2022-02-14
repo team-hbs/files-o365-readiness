@@ -1,5 +1,5 @@
 ﻿$hashOffices = @{}
-$lifetimeLimit = 2
+$lifetimeLimit = 1
  
 $Host.UI.RawUI.WindowTitle = 'OfficeMonitor'
  
@@ -28,9 +28,11 @@ while($true)
             if ($minutes -gt $lifetimeLimit)
             {
                 write-host ''
-                write-host 'Stopping Process' $tempItem.Name 'Id' $app.Id '|' + $tempItem.Id "Minutes" $minutes -f Yellow
+                write-host 'Stopping Process' $tempItem.Name 'Id' $app.Id '|' + $tempItem.Id "Minutes:" $minutes -f Yellow
                 Stop-Process -Id $app.Id  -Confirm:$false -PassThru
                 $hashOffices.Remove($app.Id)
+                [gc]::collect()
+                [gc]::WaitForPendingFinalizers()
             }
         }
     }

@@ -1,18 +1,12 @@
+#1.21
 $global:unixEpoch = Get-Date -Date "01/01/1970"
-$global:DataSource = $PSScriptRoot + "\FilesToO365.db"
-$global:LastModifiedDate = $null
+#$global:DataSource = $PSScriptRoot + "\FilesToO365.db"
+
 
 #function InitCrawl($ownerId, $email, $startPath, $doConvert)
-function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $lastModifiedDate)
+function InitCrawl($ownerId, $startPath, $doConvert, $noOffice)
 {
-	if ($lastModifiedDate -eq $null)
-	{
-		AddEvent -ownerId $ownerId -eventType 'ScanStarted'
-	}
-	else
-	{
-		AddEvent -ownerId $ownerId -eventType 'LastModifiedScanStarted'
-	}
+	AddEvent -ownerId $ownerId -eventType 'MigrationScanStarted'
     if ($noOffice) {
         Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
     } else {
@@ -20,6 +14,7 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $lastModifiedDat
         $global:excel = $null
         $global:powerpoint = $null
     }
+
 
 	$filesUsersTableName = ""
 	$filesTableName = ""
@@ -33,8 +28,7 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $lastModifiedDat
 		$filesUsersTableName = "ScanJob"
 		$filesTableName = "ScanFile"
 	}
-	
-	$global:LastModifiedDate = $lastModifiedDate
+
 
     $StartPath = $path
     $ownerId = $ownerId
@@ -53,51 +47,32 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $lastModifiedDat
     }
    
     write-host 'Getting overall count for ' $StartPath ' this may take a while....'
-    
-	#CHANGE THIS TO $true IF SCRIPT HANGS TOO LONG
-	$skipInitialFileCount = $false
-	if ($skipInitialFileCount)
-	{
-		$global:overallFileCount = 1000000000
-	}
-	else
-	{
-		$global:overallFileCount = (Get-ChildItem -LiteralPath $tempStartPath -Recurse -File | Measure-Object | Select-Object -Property Count).Count
-	}
+    $global:overallFileCount = (Get-ChildItem -LiteralPath $tempStartPath -Recurse -File | Measure-Object | Select-Object -Property Count).Count
     
     CrawlFolder $StartPath $ownerId
-	if ($lastModifiedDate -eq $null)
+	
+    InsertUserEntry $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
+    UpdateExtensions $ownerId
+    UpdateFileTotals $ownerId
+    UpdateOfficeErrorTotals $ownerId
+    UpdateMacroCount $ownerId
+    UpdateOldOfficeCount $ownerId
+    UpdatePathLengthCount  $ownerId
+    UpdateNoAccessErrorTotals $ownerId
+	
+    if ($doConvert -eq $true)
     {
-        InsertUserEntry $ownerId $global:currentFileCount $global:currentFileSize $global:currentErrorCount
-        UpdateExtensions $ownerId
-        UpdateFileTotals $ownerId
-        UpdateOfficeErrorTotals $ownerId
-        UpdateMacroCount $ownerId
-        UpdateOldOfficeCount $ownerId
-        UpdatePathLengthCount  $ownerId
-        UpdateNoAccessErrorTotals $ownerId
-    	
-        if ($doConvert -eq $true)
-        {
-            UpdateOfficeConversion $ownerId
-        }
+        UpdateOfficeConversion $ownerId
     }
     #clean up orphaned office instances
     if ($noOffice) {
         Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
     } else {
-        Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
-        Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
-        Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+        #Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+        #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+        #Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
     }
-	if ($lastModifiedDate -eq $null)
-	{
-		AddEvent -ownerId $ownerId -eventType 'ScanEnded'
-	}
-	else
-	{
-		AddEvent -ownerId $ownerId -eventType 'LastModifiedScanEnded'
-	}
+	AddEvent -ownerId $ownerId -eventType 'MigrationScanEnded'
 }
 
 
@@ -144,18 +119,18 @@ function WaitForKeyPress($message)
     }
 }
 
+
 function CrawlFolder($path, $ownerId, $currentDepth)
 {
-	#check for stop file
-	$workingDirectory = (Get-Location)
-	$stopFile = $workingDirectory.Path + '\pause.txt'
-	if (Test-Path -Path $stopFile -PathType Leaf)
-	{
-		WaitForKeyPress 'Delete pause.txt and Press Any Key To Continue'
-	}
-
     try
     {
+		#check for stop file
+		$workingDirectory = (Get-Location)
+		$stopFile = $workingDirectory.Path + '\pause.txt'
+		if (Test-Path -Path $stopFile -PathType Leaf)
+		{
+			WaitForKeyPress 'Delete pause.txt and Press Any Key To Continue'
+		}
         if ($path.StartsWith('\\'))
         {
             $tempPath = 'FileSystem::' + $path
@@ -168,21 +143,7 @@ function CrawlFolder($path, $ownerId, $currentDepth)
 	    {
 		    $tempPath = $path
 		    write-host $file.Name 
-            #TODO: Check for modified vs ScanModified
-          
-            if ($global:LastModifiedDate -ne $null)
-            {
-                $lastModified = $file.LastWriteTime
-				$created = $file.CreationTime
-                if ($lastModified -gt (Get-Date $global:LastModifiedDate) -OR $created -gt (Get-Date $global:LastModifiedDate))
-                {
-		            InsertRow $file $path $ownerId $currentDepth
-                }
-            }
-            else
-            {
-                InsertRow $file $path $ownerId $currentDepth
-            }
+		    InsertRow $file $path $ownerId $currentDepth
 	    }
         foreach ($folder in Get-ChildItem -LiteralPath $tempPath -Directory -ErrorAction Continue)
 	    {
@@ -244,14 +205,18 @@ function ConvertDocument($path, $file, $saveAs)
 
     $filePath = $path + "\" + $file.Name
     $name = $file.Name
-    write-host "Inspecting:" $filePath 
+    write-host "ConvertDocument()" $filePath 
 	$parts = $filePath.Split('.')
 	$extension = $parts[$parts.length - 1]
 	$baseFileName = $filePath.Replace("." + $extension, "")
 	$converted = $false
 	$message = ""
     $oldFormat = $false
-	try
+    $global:word = $null
+    $global:excel  = $null
+    $global:powerpoint =  $null
+	
+try
 	{
 		if ($extension -eq "doc")
 		{
@@ -261,8 +226,8 @@ function ConvertDocument($path, $file, $saveAs)
             } else {
                 if ($global:word -eq $null -OR $global:word.documents -eq $null)
                 {
-                    [gc]::collect()
-                    [gc]::WaitForPendingFinalizers()
+                    #[gc]::collect()
+                    #[gc]::WaitForPendingFinalizers()
                     $global:word = new-object -comobject word.application
                     $global:word.Visible = $False
                     $global:word.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.Word.WdAlertLevel],"wdAlertsNone")
@@ -270,7 +235,6 @@ function ConvertDocument($path, $file, $saveAs)
                     #$global:excel.DisplayAlerts = $False;
                     $global:wordSaveFormat = [Enum]::Parse([Microsoft.Office.Interop.Word.WdSaveFormat],"wdFormatDocumentDefault")
                     $global:word.AutomationSecurity = 'msoAutomationSecurityForceDisable'
-					#$global:word.AutoRecover.Enabled = $false
                 }
                 
                 $testFilePath = $filePath + "x"
@@ -281,24 +245,23 @@ function ConvertDocument($path, $file, $saveAs)
                     $savename = $filePath.ToLower() + 'x'
                     #copy to local location
                     Write-Host "opening:" $filePath  
-					if ($doConvert)
+                    if ($doConvert)
 					{
-						write-host "Saving as :" $savename -ForegroundColor Cyan
-					}
+                        write-host "Saving as :" $savename -ForegroundColor Cyan
+                    }
                     try
                     {			    
                         #$opendoc = $global:word.documents.open($filePath,$false,$true)
                         #new 7/27/19
                         #$opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true)
                         #new 2/5/21
-                        $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
-				
+                        $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'') 
                         if ($saveAs -eq $true -AND $opendoc -ne $null)
                         {
                             $opendoc.saveas([ref]"$savename", [ref]$global:wordSaveFormat);
                             $converted = $true
+                            $opendoc.close($false)
                         }
-						$opendoc.close($false)
                         if ($opendoc -eq $null)
                         {
                             write-host "DOC IS NULL" -ForegroundColor yellow
@@ -319,12 +282,11 @@ function ConvertDocument($path, $file, $saveAs)
                             #$opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true)
                             #new 2/5/21
                             $opendoc = $global:word.documents.OpenNoRepairDialog($tempFilePath,$false,$true,$false,'')
-							
                             if ($saveAs)
                             {
                                 $opendoc.saveas([ref]"$tempSaveName", [ref]$global:wordSaveFormat);
                             }
-                            $opendoc.close($false);
+                            #$opendoc.close($false);
                             $newTempFilePath =  "c:\temp\" + $name  + "x" 
                             #copy back to original location
                             if ($saveAs -eq $true)
@@ -346,7 +308,7 @@ function ConvertDocument($path, $file, $saveAs)
                     }
                     finally
                     {
-                        Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+                        #Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
                     }
                 }
                 else
@@ -366,35 +328,38 @@ function ConvertDocument($path, $file, $saveAs)
             {
                 if ($global:excel -eq $null -OR $global:excel.workbooks -eq $null)
                 {
-                    [gc]::collect()
-                    [gc]::WaitForPendingFinalizers()
+                    #[gc]::collect()
+                    #[gc]::WaitForPendingFinalizers()
                     $global:excel = new-object -comobject excel.application
                     $global:excel.Visible = $False
                     $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
                     $global:excel.DisplayAlerts = $False;
                     $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
-					#$global:excel.AutoRecover.Enabled = $false
                 }
                 $testFilePath = $filePath + "x"
                 if ([System.IO.File]::Exists($testFilePath) -eq $false)
                 {
                     try
                     {
+                    
                         $savename = $filePath.ToLower() + 'x'
+
                         $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
-						
+       
                         if ($workbook.HasVBProject)
                         {
                             $result.HasMacro = $true
 							if ($saveAs -eq $true)
-                            {
+							{
 								$savename = $savename -Replace ".xlsx", ".xlsm"
 								$workBook.saveas([ref]"$savename", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
 							}
                         }
                         else
                         {
-							if ($saveAs -eq $true)
+                        #$savename = ($filePath).substring(0,($filePath).lastindexOf("."))
+
+                        if ($saveAs -eq $true)
                             {
                                 $workBook.saveas([ref]"$savename", [ref]$global:excelSaveFormat);
                             }
@@ -412,7 +377,6 @@ function ConvertDocument($path, $file, $saveAs)
                             #copy to local location
                             Copy-Item $filePath -Destination $tempFilePath
                             $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
-
                             if ($workbook.HasVBProject)
                             {
                                 $result.HasMacro = $true
@@ -450,7 +414,7 @@ function ConvertDocument($path, $file, $saveAs)
                     }
                     finally
                     {
-                        Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+                        #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
                     }
                 }
                 else
@@ -470,10 +434,12 @@ function ConvertDocument($path, $file, $saveAs)
             {
                 if ($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null )
                 {
-                    [gc]::collect()
-                    [gc]::WaitForPendingFinalizers()
+                    #[gc]::collect()
+                    #[gc]::WaitForPendingFinalizers()
                     $global:powerpoint = New-Object -ComObject PowerPoint.application
                     $global:powerpointSaveFormat = [Microsoft.Office.Interop.PowerPoint.PpSaveAsFileType]::ppSaveAsOpenXMLPresentation 
+                    #$global:powerpoint.DisplayAlerts = $False;
+                    #$global:powerpoint.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.PowerPoint.WdAlertLevel],"wdAlertsNone")
                     $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
                     $global:powerpoint.AutomationSecurity = 'msoAutomationSecurityForceDisable'
 
@@ -527,7 +493,7 @@ function ConvertDocument($path, $file, $saveAs)
                     }
                     finally
                     {
-                        Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+                        #Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
                     }
                 }
                 else
@@ -599,12 +565,12 @@ function UpdateNoAccessErrorTotals($ownerId)
     {
         $query = "select count(*) as count from  $filesTableName  where Error = 'No Access' AND OwnerId = $ownerId"
         $Result = SqlQueryReturn($query)
-        $officeErrorCount = 0
+        $noAccessCount = 0
         Foreach ($row in $Result) 
         {
-            $officeErrorCount = $row.count
+            $noAccessCount = $row.count
         }
-        $query = "UPDATE  $filesUsersTableName  SET NoAccessCount = $officeErrorCount WHERE OwnerId = $ownerId"
+        $query = "UPDATE  $filesUsersTableName  SET NoAccessCount = $noAccessCount WHERE OwnerId = $ownerId"
 	    $rowsAffected = SqlQueryInsert($query)
 	    }
 	catch
@@ -887,9 +853,8 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 		if ($arrPathSplits.length -gt 19) { $Folder19 = $arrPathSplits[19].Trim().ToLower()}
 		if ($arrPathSplits.length -gt 20) { $Folder20 = $arrPathSplits[20].Trim().ToLower()}
 		
-   
-        $scanCreatedDate = (Get-Date).ToString('yyyy/MM/dd HH:mm:ss')
-
+		$scanCreatedDate = (Get-Date).ToString('yyyy/MM/dd HH:mm:ss')
+		
         $RelativeFolder = $tempParentFolderCurrent.Replace($StartPath.ToLower(), "")
 		if ($global:SqlServer)
         {

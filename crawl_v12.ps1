@@ -87,9 +87,9 @@ function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $lastModifiedDat
     if ($noOffice) {
         Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
     } else {
-        Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
-        Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
-        Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+        #Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+        #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+        #Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
     }
 	if ($lastModifiedDate -eq $null)
 	{
@@ -220,8 +220,8 @@ function CollectDocumentLinks2($ownerId)
         {
             try
             {
-                [gc]::collect()
-                [gc]::WaitForPendingFinalizers()
+                #[gc]::collect()
+                #[gc]::WaitForPendingFinalizers()
                 $global:word = new-object -comobject word.application
                 $global:word.Visible = $False
                 $global:word.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.Word.WdAlertLevel],"wdAlertsNone")
@@ -254,14 +254,14 @@ function CollectDocumentLinks2($ownerId)
             {
                 $opendoc.close($false)
             }
-            Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+            #Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
         }  
         elseif ($extension -eq 'xls' -OR $extension -eq 'xlsx') 
         {
             try
             {
-                [gc]::collect()
-                [gc]::WaitForPendingFinalizers()
+                #[gc]::collect()
+                #[gc]::WaitForPendingFinalizers()
                 $global:excel = new-object -comobject excel.application
                 $global:excel.Visible = $False
                 $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
@@ -296,14 +296,14 @@ function CollectDocumentLinks2($ownerId)
             {
                 $workBook.close($false);
             }
-            Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+            #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
         }
         elseif ($extension -eq 'ppt' -OR $extension -eq 'pptx') 
         {
             try
             {
-                [gc]::collect()
-                [gc]::WaitForPendingFinalizers()
+                #[gc]::collect()
+                #[gc]::WaitForPendingFinalizers()
                 $global:powerpoint = New-Object -ComObject PowerPoint.application
                 $global:powerpointSaveFormat = [Microsoft.Office.Interop.PowerPoint.PpSaveAsFileType]::ppSaveAsOpenXMLPresentation 
                 $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
@@ -336,7 +336,7 @@ function CollectDocumentLinks2($ownerId)
             {
                write-host $_.Exception.Message -f Yellow
             }
-            Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+            #Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
         }
     } 
 }
@@ -466,6 +466,11 @@ function ConvertDocument($path, $file, $saveAs)
 	$message = ""
     $oldFormat = $false
     $hasLinks = $false
+	
+	$global:word = $null
+    $global:excel  = $null
+    $global:powerpoint =  $null
+	
 	try
 	{
        
@@ -477,8 +482,8 @@ function ConvertDocument($path, $file, $saveAs)
             } else {
                 if ($global:word -eq $null -OR $global:word.documents -eq $null)
                 {
-                    [gc]::collect()
-                    [gc]::WaitForPendingFinalizers()
+                    #[gc]::collect()
+                    #[gc]::WaitForPendingFinalizers()
                     $global:word = new-object -comobject word.application
                     $global:word.Visible = $False
                     $global:word.DisplayAlerts = [Enum]::Parse([Microsoft.Office.Interop.Word.WdAlertLevel],"wdAlertsNone")
@@ -582,7 +587,7 @@ function ConvertDocument($path, $file, $saveAs)
                         }
                         finally
                         {
-                            Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
+                            #Stop-Process -Name "WINWORD" -Force -ErrorAction SilentlyContinue
                         }
                     }
                     else
@@ -603,8 +608,8 @@ function ConvertDocument($path, $file, $saveAs)
             {
                 if ($global:excel -eq $null -OR $global:excel.workbooks -eq $null)
                 {
-                    [gc]::collect()
-                    [gc]::WaitForPendingFinalizers()
+                    #[gc]::collect()
+                    #[gc]::WaitForPendingFinalizers()
                     $global:excel = new-object -comobject excel.application
                     $global:excel.Visible = $False
                     $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
@@ -712,7 +717,7 @@ function ConvertDocument($path, $file, $saveAs)
                     }
                     finally
                     {
-                        Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+                        #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
                     }
                 }
                 else
@@ -733,8 +738,8 @@ function ConvertDocument($path, $file, $saveAs)
             {
                 if ($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null )
                 {
-                    [gc]::collect()
-                    [gc]::WaitForPendingFinalizers()
+                    #[gc]::collect()
+                    #[gc]::WaitForPendingFinalizers()
                     $global:powerpoint = New-Object -ComObject PowerPoint.application
                     $global:powerpointSaveFormat = [Microsoft.Office.Interop.PowerPoint.PpSaveAsFileType]::ppSaveAsOpenXMLPresentation 
                     $global:powerpoint.DisplayAlerts =  [Microsoft.Office.Interop.PowerPoint.PpAlertLevel]::ppAlertsNone
@@ -818,7 +823,7 @@ function ConvertDocument($path, $file, $saveAs)
                         }
                         finally
                         {
-                            Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
+                            #Stop-Process -Name "POWERPNT" -Force -ErrorAction SilentlyContinue
                         }
                     }
                     else
