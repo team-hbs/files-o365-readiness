@@ -616,6 +616,9 @@ elseif($mode -eq 'Clear')
 			$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
 			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
+			$query = "DELETE FROM ScanLink WHERE OwnerId = $ownerId"
+			write-host $query -ForegroundColor Green
+            SqlQueryInsert $query
         }
     }
     elseif($ownerId -ne -1)
@@ -624,6 +627,9 @@ elseif($mode -eq 'Clear')
 		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
 		$query = "DELETE FROM ScanJob WHERE OwnerId = $ownerId"
+		write-host $query -ForegroundColor Green
+        SqlQueryInsert $query
+		$query = "DELETE FROM ScanLink WHERE OwnerId = $ownerId"
 		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
     }
@@ -698,7 +704,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			if ($lastModifiedDate -eq $null)
 			{
 				#start office monitor
-                OfficeMonitor
+                Start-Process PowerShell -argument '.\OfficeMonitor.ps1'
 				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
 			}
 			else
@@ -711,7 +717,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
     	            #Write-Host "Query:" $query -ForegroundColor Green
                     #$source = SqlQueryReturn($query)
 			        #start office monitor
-                    OfficeMonitor
+                    Start-Process PowerShell -argument '.\OfficeMonitor.ps1'
 				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
                 }
                 else

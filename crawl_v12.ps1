@@ -315,15 +315,17 @@ function CollectDocumentLinks2($ownerId)
                     if ($slide.Hyperlinks.Count -gt 0)
                     {
                         write-host 'Found powerpoint link' -f white
-                        $hasLinks = $true
-                        $url = $hyperlink.Address
-                        $created = Get-Date
-                        if ($url -ne $null -AND $url.Trim() -ne '')
+                        foreach($hyperlink in $slide.Hyperlinks)
                         {
-                            write-host 'LINK:' $url -f Cyan
-                            $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$url',$ownerId,$fileId,'$created')"
-                            write-host $query
-                            SqlQueryInsert -query $query
+                            $url = $hyperlink.Address
+                            $created = Get-Date
+                            if ($url -ne $null -AND $url.Trim() -ne '')
+                            {
+                                write-host 'LINK:' $url -f Cyan
+                                $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$url',$ownerId,$fileId,'$created')"
+                                write-host $query
+                                SqlQueryInsert -query $query
+                            }
                         }
                     }
                 }
@@ -451,10 +453,9 @@ function ConvertDocument($path, $file, $saveAs)
     #################
     $result = New-Object -TypeName psobject 
     $result | Add-Member -MemberType NoteProperty -Name HasMacro -Value $false
-    $result | Add-Member -MemberType NoteProperty -Name HasLink -Value $false
+    $result | Add-Member -MemberType NoteProperty -Name Links -Value @()
     $result | Add-Member -MemberType NoteProperty -Name ConvertMessage -Value ""
     $result | Add-Member -MemberType NoteProperty -Name ConvertSuccess -Value $false
-    
 
     $filePath = $path + "\" + $file.Name
     $name = $file.Name
@@ -465,7 +466,6 @@ function ConvertDocument($path, $file, $saveAs)
 	$converted = $false
 	$message = ""
     $oldFormat = $false
-    $hasLinks = $false
 	
 	$global:word = $null
     $global:excel  = $null
@@ -498,8 +498,12 @@ function ConvertDocument($path, $file, $saveAs)
                     $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
                     if ($opendoc.Hyperlinks.Count -gt 0)
                     {
-                        $hasLinks = $true
-                        write-host 'FOUND WORD LINK' -f WHITE
+                        Write-Host 'FOUND WORD LINK' -f WHITE
+
+                        foreach($hyperlink in $opendoc.Hyperlinks)
+                        {
+                            $result.Links += $hyperlink.Address
+                        }
                     }
                     $opendoc.close($false)
                 }
@@ -526,8 +530,12 @@ function ConvertDocument($path, $file, $saveAs)
                             write-host 'HYPERLINK COUNT:' 	$opendoc.Hyperlinks.Count			        
                             if ($opendoc.Hyperlinks.Count -gt 0)
                             {
-                                $hasLinks = $true
                                 write-host 'FOUND WORD LINK' -f WHITE
+
+                                foreach($hyperlink in $opendoc.Hyperlinks)
+                                {
+                                    $result.Links += $hyperlink.Address
+                                }
                             }
 
                             if ($saveAs -eq $true -AND $opendoc -ne $null)
@@ -559,8 +567,12 @@ function ConvertDocument($path, $file, $saveAs)
                                 write-host 'HYPERLINK COUNT:' 	$opendoc.Hyperlinks.Count	-f Cyan
 							    if ($opendoc.Hyperlinks.Count -gt 0)
                                 {
-                                    $hasLinks = $true
                                     write-host 'FOUND WORD LINK' -f WHITE
+
+                                    foreach($hyperlink in $opendoc.Hyperlinks)
+                                    {
+                                        $result.Links += $hyperlink.Address
+                                    }
                                 }
                                 if ($saveAs)
                                 {
@@ -625,7 +637,11 @@ function ConvertDocument($path, $file, $saveAs)
                         if ($worksheet.Hyperlinks.Count -gt 0)
                         {
                             write-host 'Found EXCEL link' -f white
-                            $hasLinks = $true
+
+                            foreach($hyperlink in $worksheet.Hyperlinks)
+                            {
+                                $result.Links += $hyperlink.Address
+                            }
                         }
                          
                     }
@@ -644,7 +660,12 @@ function ConvertDocument($path, $file, $saveAs)
                             {
                                 if ($worksheet.Hyperlinks.Count -gt 0)
                                 {
-                                    $hasLinks = $true
+                                    write-host 'Found EXCEL link' -f white
+
+                                    foreach($hyperlink in $worksheet.Hyperlinks)
+                                    {
+                                        $result.Links += $hyperlink.Address
+                                    }
                                 }
                             }
                             if ($workbook.HasVBProject)
@@ -678,7 +699,12 @@ function ConvertDocument($path, $file, $saveAs)
                                 $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
                                 if ($worksheet.Hyperlinks.Count -gt 0)
                                 {
-                                    $hasLinks = $true
+                                    write-host 'Found EXCEL link' -f white
+
+                                    foreach($hyperlink in $worksheet.Hyperlinks)
+                                    {
+                                        $result.Links += $hyperlink.Address
+                                    }
                                 }
                                 if ($workbook.HasVBProject)
                                 {
@@ -749,15 +775,19 @@ function ConvertDocument($path, $file, $saveAs)
                 if ($extension -eq 'pptx')
                 {
                    $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
-                   foreach($slide in $presentation.Slides)
-                   {
-                    if ($slide.Hyperlinks.Count -gt 0)
+                    foreach($slide in $presentation.Slides)
                     {
-                        write-host 'Found powerpoint link' -f white
-                        $hasLinks = $true
+                        if ($slide.Hyperlinks.Count -gt 0)
+                        {
+                            write-host 'Found powerpoint link' -f white
+
+                            foreach($hyperlink in $slide.Hyperlinks)
+                            {
+                                $result.Links += $hyperlink.Address
+                            }
+                        }
                     }
-                   }
-                   $presentation.close()
+                    $presentation.close()
                 }
                 elseif ($extension -eq 'ppt')
                 {
@@ -773,7 +803,12 @@ function ConvertDocument($path, $file, $saveAs)
                             {
                                 if ($slide.Hyperlinks.Count -gt 0)
                                 {
-                                    $hasLinks = $true
+                                    write-host 'Found powerpoint link' -f white
+                                    
+                                    foreach($hyperlink in $slide.Hyperlinks)
+                                    {
+                                        $result.Links += $hyperlink.Address
+                                    }
                                 }
                             }
                             if ($saveAs -eq $true)
@@ -797,7 +832,12 @@ function ConvertDocument($path, $file, $saveAs)
                                 {
                                     if ($slide.Hyperlinks.Count -gt 0)
                                     {
-                                        $hasLinks = $true
+                                        write-host 'Found powerpoint link' -f white
+                                    
+                                        foreach($hyperlink in $slide.Hyperlinks)
+                                        {
+                                            $result.Links += $hyperlink.Address
+                                        }
                                     }
                                 }
                                 if ($saveAs -eq $true)
@@ -991,7 +1031,6 @@ function ConvertDocument($path, $file, $saveAs)
 
     }
     #>
-    $result.HasLink = $hasLinks
     return $result
 }
 
@@ -1257,7 +1296,6 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 
     }
     $path = $path -Replace "'", "''"
-    $hasMacro = $false
     $tempFilePath = $path + "\" + $file.Name
     $tempFilePathLength = $tempFilePath.Length
 
@@ -1271,7 +1309,7 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
     {
         $hasMacroValue = 1
     }
-    if ($result.HasLink -eq $true)
+    if ($result.Links.Length -gt 0)
     {
         $hasLinkValue = 1
     }
@@ -1375,6 +1413,25 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 
         write-host $query -ForegroundColor Green
 		$rowsAffected = SqlQueryInsert($query)
+        if($hasLinkValue)
+        {
+            $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
+            $sqlResult = SqlQueryReturn($query)
+            foreach($row in $sqlResult)
+            {
+                $fileId = $row.Id
+            }
+
+            foreach($link in $result.Links)
+            {
+                if ($link -ne $null -AND $link.Trim() -ne '')
+                {
+                    $created = Get-Date
+                    $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$link',$ownerId,$fileId,'$created')"
+                    SqlQueryInsert -query $query
+                }
+            }
+        }
 		#New-Object -TypeName PsObject -Property @{FileName=$fileName;Message="success";ParentFolderCurrent=$parentFolderCurrent;Query=$query}
 	}
 	catch

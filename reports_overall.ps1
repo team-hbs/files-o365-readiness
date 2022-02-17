@@ -163,7 +163,7 @@ if ($batchNumber -ne -1)
     $logFile = '.\batch_' + $batchNumber + '_scan.xlsx'
 	$sources = SqlQueryReturn($batchQuery)
 }
-if ($batches -ne '' -AND $batches -ne $null)
+elseif ($batches -ne '' -AND $batches -ne $null)
 {
     $batchQuery = "SELECT * FROM Source WHERE BatchNumber IN (" + $batches + ")"
     $logFile = '.\batch_' + $batches.Replace(',','_') + '_scan.xlsx'
