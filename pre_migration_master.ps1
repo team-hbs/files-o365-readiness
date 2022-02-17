@@ -220,8 +220,18 @@ function InitPreMigrationMaster($directory) {
 	{
 		$noOffice = $false
 	}
+
+	$noLinksValue = [String] (GetConfig('NoLinks') )
+    if ($noLinksValue -eq 'true')
+    {
+		$noLinks = $true
+	}
+	else
+	{
+		$noLinks = $false
+	}
 	
-	$errors = InitCrawl $ownerId $path $false $noOffice |  Select-Object FileName,Message,ParentFolderCurrent, Query
+	$errors = InitCrawl $ownerId $path $false $noOffice $noLinks|  Select-Object FileName,Message,ParentFolderCurrent, Query
 	if ($global:currentErrorCount -gt 0) {
 		$errors | Export-Csv $logFile
 	}
@@ -686,6 +696,16 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			$noOffice = $false
 		}
 		
+		$noLinksValue = [String] (GetConfig('NoLinks') )
+		if ($noLinksValue -eq 'true')
+		{
+			$noLinks = $true
+		}
+		else
+		{
+			$noLinks = $false
+		}
+
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
@@ -705,7 +725,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			{
 				#start office monitor
                 Start-Process PowerShell -argument '.\OfficeMonitor.ps1'
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks
 			}
 			else
 			{
@@ -718,7 +738,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
                     #$source = SqlQueryReturn($query)
 			        #start office monitor
                     Start-Process PowerShell -argument '.\OfficeMonitor.ps1'
-				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
+				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -lastModifiedDate $lastModifiedDate
                 }
                 else
                 {
@@ -746,6 +766,17 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 		{
 			$noOffice = $false
 		}
+
+		$noLinksValue = [String] (GetConfig('NoLinks') )
+		if ($noLinksValue -eq 'true')
+		{
+			$noLinks = $true
+		}
+		else
+		{
+			$noLinks = $false
+		}
+
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
@@ -762,11 +793,11 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			}
 			if ($lastModifiedDate -eq $null)
 			{
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks
 			}
 			else
 			{
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -lastModifiedDate $lastModifiedDate
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -lastModifiedDate $lastModifiedDate
 			}
             $currentDirectory++
         }
@@ -790,13 +821,24 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 		{
 			$noOffice = $false
 		}
+
+		$noLinksValue = [String] (GetConfig('NoLinks') )
+		if ($noLinksValue -eq 'true')
+		{
+			$noLinks = $true
+		}
+		else
+		{
+			$noLinks = $false
+		}
+
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
 			$ownerId = $row.Id
-            InitCrawl $ownerId $path $false $noOffice
+            InitCrawl $ownerId $path $false $noOffice $noLinks
             $currentDirectory++
         }
     }
