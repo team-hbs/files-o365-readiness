@@ -724,7 +724,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			if ($lastModifiedDate -eq $null)
 			{
 				#start office monitor
-                Start-Process PowerShell -argument '.\OfficeMonitor.ps1'
+                OfficeMonitor
 				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks
 			}
 			else
@@ -737,7 +737,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
     	            #Write-Host "Query:" $query -ForegroundColor Green
                     #$source = SqlQueryReturn($query)
 			        #start office monitor
-                    Start-Process PowerShell -argument '.\OfficeMonitor.ps1'
+                    OfficeMonitor
 				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -lastModifiedDate $lastModifiedDate
                 }
                 else
