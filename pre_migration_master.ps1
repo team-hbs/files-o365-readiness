@@ -879,19 +879,19 @@ elseif ($mode -eq 'Import')
 	{
 			try
 			{
-				$batchNumber = $source.BatchNumber
+				$sourceBatchNumber = $source.BatchNumber
 				$adHomeDirectory = $source.SourceDirectory.Trim().ToLower()
 
 				if ($adHomeDirectory -eq $null)
 				{
 					$adHomeDirectory = ''
 				}
-				if ($batchNumber -ne $null -AND $adHomeDirectory.Trim() -ne '')
+				if ($sourceBatchNumber -ne $null -AND $adHomeDirectory -ne '')
 				{
 					$dbSourceId = $null
 					foreach($dbSource in $dbSources)
 					{
-						if ($dbSource.ADHomeDirectory -eq $adHomeDirectory.ToLower().Trim())
+						if ($dbSource.ADHomeDirectory -eq $adHomeDirectory)
 						{
 							$dbSourceId = $dbSource.Id
 							break
@@ -899,11 +899,18 @@ elseif ($mode -eq 'Import')
 					}
 					if ($dbSourceId -eq $null)
 					{
-						$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $batchNumber)"
+						if ($batchNumber -eq -1 -OR $batchNumber -contains $sourceBatchNumber)
+						{
+							$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $sourceBatchNumber)"
+						} 
 					}
 					else
 					{
-						$query = "UPDATE Source SET BatchNumber = $batchNumber WHERE Id = $dbSourceId"
+						if ($batchNumber -eq -1 -OR $batchNumber -contains $sourceBatchNumber)
+						{
+							$query = "UPDATE Source SET BatchNumber = $sourceBatchNumber WHERE Id = $dbSourceId"
+					
+						}
 					}
 					write-host $query
 					write-host "Query:" $query -ForegroundColor Green 	   
