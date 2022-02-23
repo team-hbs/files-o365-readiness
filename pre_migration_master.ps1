@@ -10,6 +10,7 @@
 	[string]$key = '',
 	[string]$value = '',
     [int]$batchNumber = -1,
+	[int[]]$importBatch = -1,
     [int]$sourceId = -1,
 	[boolean]$encrypt = $false
 )
@@ -899,14 +900,14 @@ elseif ($mode -eq 'Import')
 					}
 					if ($dbSourceId -eq $null)
 					{
-						if ($batchNumber -eq -1 -OR $batchNumber -contains $sourceBatchNumber)
+						if ($batchNumber -eq -1 -OR $importBatch -contains $sourceBatchNumber)
 						{
 							$query = "INSERT INTO Source (ADHomeDirectory, BatchNumber) VALUES ('$adHomeDirectory', $sourceBatchNumber)"
 						} 
 					}
 					else
 					{
-						if ($batchNumber -eq -1 -OR $batchNumber -contains $sourceBatchNumber)
+						if ($batchNumber -eq -1 -OR $importBatch -contains $sourceBatchNumber)
 						{
 							$query = "UPDATE Source SET BatchNumber = $sourceBatchNumber WHERE Id = $dbSourceId"
 					
