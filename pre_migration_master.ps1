@@ -231,8 +231,28 @@ function InitPreMigrationMaster($directory) {
 	{
 		$noLinks = $false
 	}
+
+	$noSSNValue = [String] (GetConfig('NoSSN') )
+    if ($noSSNValue -eq 'true')
+    {
+		$noSSN = $true
+	}
+	else
+	{
+		$noSSN = $false
+	}
+
+	$noCCValue = [String] (GetConfig('NoCC') )
+    if ($noCCValue -eq 'true')
+    {
+		$noCC = $true
+	}
+	else
+	{
+		$noCC = $false
+	}
 	
-	$errors = InitCrawl $ownerId $path $false $noOffice $noLinks|  Select-Object FileName,Message,ParentFolderCurrent, Query
+	$errors = InitCrawl $ownerId $path $false $noOffice $noLinks $noSSN $noCC | Select-Object FileName,Message,ParentFolderCurrent, Query
 	if ($global:currentErrorCount -gt 0) {
 		$errors | Export-Csv $logFile
 	}
@@ -630,6 +650,12 @@ elseif($mode -eq 'Clear')
 			$query = "DELETE FROM ScanLink WHERE OwnerId = $ownerId"
 			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
+			$query = "DELETE FROM ScanSSN WHERE OwnerId = $ownerId"
+			write-host $query -ForegroundColor Green
+            SqlQueryInsert $query
+			$query = "DELETE FROM ScanCC WHERE OwnerId = $ownerId"
+			write-host $query -ForegroundColor Green
+            SqlQueryInsert $query
         }
     }
     elseif($ownerId -ne -1)
@@ -641,6 +667,12 @@ elseif($mode -eq 'Clear')
 		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
 		$query = "DELETE FROM ScanLink WHERE OwnerId = $ownerId"
+		write-host $query -ForegroundColor Green
+        SqlQueryInsert $query
+		$query = "DELETE FROM ScanSSN WHERE OwnerId = $ownerId"
+		write-host $query -ForegroundColor Green
+        SqlQueryInsert $query
+		$query = "DELETE FROM ScanCC WHERE OwnerId = $ownerId"
 		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
     }
@@ -707,6 +739,26 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			$noLinks = $false
 		}
 
+		$noSSNValue = [String] (GetConfig('NoSSN') )
+		if ($noSSNValue -eq 'true')
+		{
+			$noSSN = $true
+		}
+		else
+		{
+			$noSSN = $false
+		}
+
+		$noCCValue = [String] (GetConfig('NoCC') )
+		if ($noCCValue -eq 'true')
+		{
+			$noCC = $true
+		}
+		else
+		{
+			$noCC = $false
+		}
+
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
@@ -726,7 +778,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			{
 				#start office monitor
                 OfficeMonitor
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC
 			}
 			else
 			{
@@ -739,7 +791,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
                     #$source = SqlQueryReturn($query)
 			        #start office monitor
                     OfficeMonitor
-				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -lastModifiedDate $lastModifiedDate
+				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC -lastModifiedDate $lastModifiedDate
                 }
                 else
                 {
@@ -778,6 +830,26 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			$noLinks = $false
 		}
 
+		$noSSNValue = [String] (GetConfig('NoSSN') )
+		if ($noSSNValue -eq 'true')
+		{
+			$noSSN = $true
+		}
+		else
+		{
+			$noSSN = $false
+		}
+
+		$noCCValue = [String] (GetConfig('NoCC') )
+		if ($noCCValue -eq 'true')
+		{
+			$noCC = $true
+		}
+		else
+		{
+			$noCC = $false
+		}
+
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
@@ -794,11 +866,11 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			}
 			if ($lastModifiedDate -eq $null)
 			{
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC
 			}
 			else
 			{
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -lastModifiedDate $lastModifiedDate
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC -lastModifiedDate $lastModifiedDate
 			}
             $currentDirectory++
         }
@@ -833,13 +905,33 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			$noLinks = $false
 		}
 
+		$noSSNValue = [String] (GetConfig('NoSSN') )
+		if ($noSSNValue -eq 'true')
+		{
+			$noSSN = $true
+		}
+		else
+		{
+			$noSSN = $false
+		}
+
+		$noCCValue = [String] (GetConfig('NoCC') )
+		if ($noCCValue -eq 'true')
+		{
+			$noCC = $true
+		}
+		else
+		{
+			$noCC = $false
+		}
+
         foreach($row in $source)
         {
             Write-Progress -Id 2 -Activity "Directories" -Status "Progress: $currentDirectory / $directoriesCount Directories" -PercentComplete ($currentDirectory / $directoriesCount * 100)
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
 			$ownerId = $row.Id
-            InitCrawl $ownerId $path $false $noOffice $noLinks
+            InitCrawl $ownerId $path $false $noOffice $noLinks $noSSN $noCC
             $currentDirectory++
         }
     }

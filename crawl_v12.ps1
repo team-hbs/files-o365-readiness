@@ -3,7 +3,7 @@ $global:DataSource = $PSScriptRoot + "\FilesToO365.db"
 $global:LastModifiedDate = $null
 
 #function InitCrawl($ownerId, $email, $startPath, $doConvert)
-function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $noLinks, $lastModifiedDate)
+function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $noLinks, $noSSN, $noCC, $lastModifiedDate)
 {
 	if ($lastModifiedDate -eq $null)
 	{
@@ -454,6 +454,8 @@ function ConvertDocument($path, $file, $saveAs)
     $result = New-Object -TypeName psobject 
     $result | Add-Member -MemberType NoteProperty -Name HasMacro -Value $false
     $result | Add-Member -MemberType NoteProperty -Name Links -Value @()
+    $result | Add-Member -MemberType NoteProperty -Name SSNMatches -Value @()
+    $result | Add-Member -MemberType NoteProperty -Name CCMatches -Value @()
     $result | Add-Member -MemberType NoteProperty -Name ConvertMessage -Value ""
     $result | Add-Member -MemberType NoteProperty -Name ConvertSuccess -Value $false
 
@@ -495,16 +497,39 @@ function ConvertDocument($path, $file, $saveAs)
                 }
                 if ($extension -eq "docx")
                 {
-                    if(!$noLinks)
+                    $opendoc = $null
+                    if (!$noLinks -OR !$noSSN -OR !$noCC)
                     {
                         $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
-                        if ($opendoc.Hyperlinks.Count -gt 0)
+                    
+                        if (!$noLinks)
                         {
-                            Write-Host 'FOUND WORD LINK' -f WHITE
-
-                            foreach($hyperlink in $opendoc.Hyperlinks)
+                            if ($opendoc.Hyperlinks.Count -gt 0)
                             {
-                                $result.Links += $hyperlink.Address
+                                Write-Host 'FOUND WORD LINK' -f WHITE
+
+                                foreach($hyperlink in $opendoc.Hyperlinks)
+                                {
+                                    $result.Links += $hyperlink.Address
+                                }
+                            }
+                        }
+                        if (!$noSSN)
+                        {
+                            foreach ($paragraph in $opendoc.Paragraphs) {
+                                if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                    Write-Host 'FOUND WORD SSN MATCH' -f WHITE
+                                    $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                }
+                            }
+                        }
+                        if (!$noCC)
+                        {
+                            foreach ($paragraph in $opendoc.Paragraphs) {
+                                if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                    Write-Host 'FOUND WORD CC MATCH' -f WHITE
+                                    $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                }
                             }
                         }
                         $opendoc.close($false)
@@ -543,7 +568,24 @@ function ConvertDocument($path, $file, $saveAs)
                                     }
                                 }
                             }
-
+                            if (!$noSSN)
+                            {
+                                foreach ($paragraph in $opendoc.Paragraphs) {
+                                    if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                        Write-Host 'FOUND WORD SSN MATCH' -f WHITE
+                                        $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                    }
+                                }
+                            }
+                            if (!$noCC)
+                            {
+                                foreach ($paragraph in $opendoc.Paragraphs) {
+                                    if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                        Write-Host 'FOUND WORD CC MATCH' -f WHITE
+                                        $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                    }
+                                }
+                            }
                             if ($saveAs -eq $true -AND $opendoc -ne $null)
                             {
                                 $opendoc.saveas([ref]"$savename", [ref]$global:wordSaveFormat);
@@ -580,6 +622,24 @@ function ConvertDocument($path, $file, $saveAs)
                                         foreach($hyperlink in $opendoc.Hyperlinks)
                                         {
                                             $result.Links += $hyperlink.Address
+                                        }
+                                    }
+                                }
+                                if (!$noSSN)
+                                {
+                                    foreach ($paragraph in $opendoc.Paragraphs) {
+                                        if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                            Write-Host 'FOUND WORD SSN MATCH' -f WHITE
+                                            $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                        }
+                                    }
+                                }
+                                if (!$noCC)
+                                {
+                                    foreach ($paragraph in $opendoc.Paragraphs) {
+                                        if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                            Write-Host 'FOUND WORD CC MATCH' -f WHITE
+                                            $result.CCMatches += ($Matches[0] -replace '\d', 'X')
                                         }
                                     }
                                 }
@@ -640,9 +700,9 @@ function ConvertDocument($path, $file, $saveAs)
                 }
                 if ($extension -eq "xlsx")
                 {
+                    $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
                     if(!$noLinks)
                     {
-                        $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
                         foreach($worksheet in $workBook.worksheets)
                         {
                             if ($worksheet.Hyperlinks.Count -gt 0)
@@ -653,11 +713,43 @@ function ConvertDocument($path, $file, $saveAs)
                                 {
                                     $result.Links += $hyperlink.Address
                                 }
-                            }
-                            
+                            }    
                         }
-                        $workBook.close($false);
+                        
                     }
+                    if (!$noSSN)
+                    {
+                        foreach ($worksheet in $workBook.Sheets) {
+                            $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
+                            $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+                        
+                            for ($i = 1; $i -le $rowCount; $i++) {
+                                for ($j = 1; $j -le $columnCount; $j++) {
+                                    if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                        Write-Host 'FOUND EXCEL SSN MATCH' -f WHITE
+                                        $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (!$noCC)
+                    {
+                        foreach ($worksheet in $workBook.Sheets) {
+                            $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
+                            $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+
+                            for ($i = 1; $i -le $rowCount; $i++) {
+                                for ($j = 1; $j -le $columnCount; $j++) {
+                                    if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                        Write-Host 'FOUND EXCEL CC MATCH' -f WHITE
+                                        $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    $workBook.close($false);
                 }
                 elseif ($extension -eq "xls")
                 {
@@ -679,6 +771,38 @@ function ConvertDocument($path, $file, $saveAs)
                                         foreach($hyperlink in $worksheet.Hyperlinks)
                                         {
                                             $result.Links += $hyperlink.Address
+                                        }
+                                    }
+                                }
+                            }
+                            if (!$noSSN)
+                            {
+                                foreach ($worksheet in $workBook.Sheets) {
+                                    $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
+                                    $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+                                
+                                    for ($i = 1; $i -le $rowCount; $i++) {
+                                        for ($j = 1; $j -le $columnCount; $j++) {
+                                            if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                                Write-Host 'FOUND EXCEL SSN MATCH' -f WHITE
+                                                $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (!$noCC)
+                            {
+                                foreach ($worksheet in $workBook.Sheets) {
+                                    $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
+                                    $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+
+                                    for ($i = 1; $i -le $rowCount; $i++) {
+                                        for ($j = 1; $j -le $columnCount; $j++) {
+                                            if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                                Write-Host 'FOUND EXCEL CC MATCH' -f WHITE
+                                                $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                            }
                                         }
                                     }
                                 }
@@ -723,6 +847,38 @@ function ConvertDocument($path, $file, $saveAs)
                                             foreach($hyperlink in $worksheet.Hyperlinks)
                                             {
                                                 $result.Links += $hyperlink.Address
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!$noSSN)
+                                {
+                                    foreach ($worksheet in $workBook.Sheets) {
+                                        $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
+                                        $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+                                    
+                                        for ($i = 1; $i -le $rowCount; $i++) {
+                                            for ($j = 1; $j -le $columnCount; $j++) {
+                                                if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                                    Write-Host 'FOUND EXCEL SSN MATCH' -f WHITE
+                                                    $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!$noCC)
+                                {
+                                    foreach ($worksheet in $workBook.Sheets) {
+                                        $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
+                                        $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+                                        
+                                        for ($i = 1; $i -le $rowCount; $i++) {
+                                            for ($j = 1; $j -le $columnCount; $j++) {
+                                                if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                                    Write-Host 'FOUND EXCEL CC MATCH' -f WHITE
+                                                    $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                                }
                                             }
                                         }
                                     }
@@ -795,9 +951,9 @@ function ConvertDocument($path, $file, $saveAs)
                 }
                 if ($extension -eq 'pptx')
                 {
+                    $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
                     if(!$noLinks)
                     {
-                        $presentation = $global:powerpoint.Presentations.open("$filePath::password::", $true, $null, $false)
                         foreach($slide in $presentation.Slides)
                         {
                             if ($slide.Hyperlinks.Count -gt 0)
@@ -810,8 +966,30 @@ function ConvertDocument($path, $file, $saveAs)
                                 }
                             }
                         }
-                        $presentation.close()
                     }
+                    if (!$noSSN)
+                    {
+                        foreach ($slide in $presentation.Slides) {
+                            foreach ($shape in $slide.Shapes) {
+                                if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                    Write-Host 'FOUND POWERPOINT SSN MATCH' -f WHITE
+                                    $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                }
+                            }
+                        }
+                    }
+                    if (!$noCC)
+                    {
+                        foreach ($slide in $presentation.Slides) {
+                            foreach ($shape in $slide.Shapes) {
+                                if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                    Write-Host 'FOUND POWERPOINT CC MATCH' -f WHITE
+                                    $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                }
+                            }
+                        }
+                    }
+                    $presentation.close()
                 }
                 elseif ($extension -eq 'ppt')
                 {
@@ -834,6 +1012,28 @@ function ConvertDocument($path, $file, $saveAs)
                                         foreach($hyperlink in $slide.Hyperlinks)
                                         {
                                             $result.Links += $hyperlink.Address
+                                        }
+                                    }
+                                }
+                            }
+                            if (!$noSSN)
+                            {
+                                foreach ($slide in $presentation.Slides) {
+                                    foreach ($shape in $slide.Shapes) {
+                                        if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                            Write-Host 'FOUND POWERPOINT SSN MATCH' -f WHITE
+                                            $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                        }
+                                    }
+                                }
+                            }
+                            if (!$noCC)
+                            {
+                                foreach ($slide in $presentation.Slides) {
+                                    foreach ($shape in $slide.Shapes) {
+                                        if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                            Write-Host 'FOUND POWERPOINT CC MATCH' -f WHITE
+                                            $result.CCMatches += ($Matches[0] -replace '\d', 'X')
                                         }
                                     }
                                 }
@@ -866,6 +1066,28 @@ function ConvertDocument($path, $file, $saveAs)
                                             foreach($hyperlink in $slide.Hyperlinks)
                                             {
                                                 $result.Links += $hyperlink.Address
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!$noSSN)
+                                {
+                                    foreach ($slide in $presentation.Slides) {
+                                        foreach ($shape in $slide.Shapes) {
+                                            if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                                Write-Host 'FOUND POWERPOINT SSN MATCH' -f WHITE
+                                                $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!$noCC)
+                                {
+                                    foreach ($slide in $presentation.Slides) {
+                                        foreach ($shape in $slide.Shapes) {
+                                            if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
+                                                Write-Host 'FOUND POWERPOINT CC MATCH' -f WHITE
+                                                $result.CCMatches += ($Matches[0] -replace '\d', 'X')
                                             }
                                         }
                                     }
@@ -1318,11 +1540,13 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
     }
     catch
     {
-         $result = New-Object -TypeName psobject 
-         $result | Add-Member -MemberType NoteProperty -Name HasMacro -Value $false
-         $result | Add-Member -MemberType NoteProperty -Name HasLink -Value $false
-         $result | Add-Member -MemberType NoteProperty -Name ConvertMessage -Value $line.ToString() + ":" + $_.Exception.Message
-         $result | Add-Member -MemberType NoteProperty -Name ConvertSuccess -Value $false
+        $result = New-Object -TypeName psobject 
+        $result | Add-Member -MemberType NoteProperty -Name HasMacro -Value $false
+        $result | Add-Member -MemberType NoteProperty -Name Links -Value @()
+        $result | Add-Member -MemberType NoteProperty -Name SSNMatches -Value @()
+        $result | Add-Member -MemberType NoteProperty -Name CCMatches -Value @()
+        $result | Add-Member -MemberType NoteProperty -Name ConvertMessage -Value $line.ToString() + ":" + $_.Exception.Message
+        $result | Add-Member -MemberType NoteProperty -Name ConvertSuccess -Value $false
 
     }
     $path = $path -Replace "'", "''"
@@ -1333,6 +1557,8 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
     $convertMessage = $result.ConvertMessage
     $hasMacroValue = 0
     $hasLinkValue = 0
+    $hasSSNValue = 0
+    $hasCCValue = 0
     $convertSuccessValue = 0
 
     if ($result.HasMacro -eq $true)
@@ -1342,6 +1568,14 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
     if ($result.Links.Length -gt 0)
     {
         $hasLinkValue = 1
+    }
+    if ($result.SSNMatches.Length -gt 0)
+    {
+        $hasSSNValue = 1
+    }
+    if ($result.CCMatches.Length -gt 0)
+    {
+        $hasCCValue = 1
     }
     if ($result.ConvertSuccess -eq $true)
     {
@@ -1426,16 +1660,16 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
         {
             $createdValue = (Get-Date $Created).ToString('yyyy-MM-dd HH:mm:ss')
             $modifiedValue = (Get-Date $Modified).ToString('yyyy-MM-dd HH:mm:ss')
-            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink,"
+            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink, HasSSN, HasCC,"
 		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20,ScanCreatedDate) "
-		    $query += " VALUES ('$FileName', '$createdValue', '$modifiedValue', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$HasLinkValue,"
+		    $query += " VALUES ('$FileName', '$createdValue', '$modifiedValue', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$hasLinkValue,$hasSSNValue,$hasCCValue,"
 		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20','$scanCreatedDate')"
         }
         else
         {
-            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink,"
+            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink, HasSSN, HasCC,"
 		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20,ScanCreatedDate) "
-		    $query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$HasLinkValue,"
+		    $query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$hasLinkValue,$hasSSNValue,$hasCCValue,"
 		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20','$scanCreatedDate')"
         }
 		
@@ -1444,9 +1678,31 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
         write-host $query -ForegroundColor Green
 		$rowsAffected = SqlQueryInsert($query)
 
-        if(!$noLinks)
+        if (!$noLinks)
         {
-            if($hasLinkValue)
+            if ($hasLinkValue)
+            {
+                $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
+                $sqlResult = SqlQueryReturn($query)
+                foreach ($row in $sqlResult)
+                {
+                    $fileId = $row.Id
+                }
+
+                foreach ($link in $result.Links)
+                {
+                    if ($link -ne $null -AND $link.Trim() -ne '')
+                    {
+                        $created = Get-Date
+                        $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$link',$ownerId,$fileId,'$created')"
+                        SqlQueryInsert -query $query
+                    }
+                }
+            }
+        }
+        if (!$noSSN)
+        {
+            if ($hasSSNValue)
             {
                 $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
                 $sqlResult = SqlQueryReturn($query)
@@ -1455,12 +1711,34 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
                     $fileId = $row.Id
                 }
 
-                foreach($link in $result.Links)
+                foreach ($match in $result.SSNMatches)
                 {
-                    if ($link -ne $null -AND $link.Trim() -ne '')
+                    if ($match -ne $null -AND $match.Trim() -ne '')
                     {
                         $created = Get-Date
-                        $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$link',$ownerId,$fileId,'$created')"
+                        $query = "INSERT INTO ScanSSN (Match,OwnerId,FileId,Created) VALUES ('$match',$ownerId,$fileId,'$created')"
+                        SqlQueryInsert -query $query
+                    }
+                }
+            }
+        }
+        if (!$noCC)
+        {
+            if ($hasCCValue)
+            {
+                $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
+                $sqlResult = SqlQueryReturn($query)
+                foreach($row in $sqlResult)
+                {
+                    $fileId = $row.Id
+                }
+
+                foreach ($match in $result.CCMatches)
+                {
+                    if ($match -ne $null -AND $match.Trim() -ne '')
+                    {
+                        $created = Get-Date
+                        $query = "INSERT INTO ScanCC (Match,OwnerId,FileId,Created) VALUES ('$match',$ownerId,$fileId,'$created')"
                         SqlQueryInsert -query $query
                     }
                 }
