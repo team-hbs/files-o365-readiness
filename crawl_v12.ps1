@@ -446,6 +446,24 @@ function InsertUserEntry($ownerId, $fileCount, $fileSize, $errorCount)
 }
 
 
+function PatternSearchXlsx($filepath, $pattern) {
+    $valuesMatched = @()
+
+    $excel = Open-ExcelPackage $filepath
+
+    foreach ($sheet in $excel.Workbook.Worksheets) {
+        foreach ($cell in $sheet.Cells) {
+            if ($cell.Value -match $pattern) {
+                $valuesMatched += ($cell.Value -replace '\d', 'X')
+            }
+        }   
+    }
+
+    Close-ExcelPackage $excel -NoSave
+
+    return $valuesMatched
+}
+
 function ConvertDocument($path, $file, $saveAs)
 {
     #################
@@ -482,7 +500,7 @@ function ConvertDocument($path, $file, $saveAs)
             if ($noOffice) {
                 Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
             } else {
-                if ($global:word -eq $null -OR $global:word.documents -eq $null)
+                if (($global:word -eq $null -OR $global:word.documents -eq $null) -and ((!$noLinks -OR !$noSSN -OR !$noCC) -or $extension -eq "doc"))
                 {
                     #[gc]::collect()
                     #[gc]::WaitForPendingFinalizers()
@@ -687,6 +705,7 @@ function ConvertDocument($path, $file, $saveAs)
             } 
             else 
             {
+                <#
                 if ($global:excel -eq $null -OR $global:excel.workbooks -eq $null)
                 {
                     #[gc]::collect()
@@ -698,8 +717,10 @@ function ConvertDocument($path, $file, $saveAs)
                     $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
 					#$global:excel.AutoRecover.Enabled = $false
                 }
+                #>
                 if ($extension -eq "xlsx")
                 {
+                    <#
                     $workBook  =  $global:excel.workbooks.open("$filePath", $false, $true, 5, "")
                     if(!$noLinks)
                     {
@@ -717,45 +738,35 @@ function ConvertDocument($path, $file, $saveAs)
                         }
                         
                     }
+                    #>
                     if (!$noSSN)
                     {
-                        foreach ($worksheet in $workBook.Sheets) {
-                            $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
-                            $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
-                        
-                            for ($i = 1; $i -le $rowCount; $i++) {
-                                for ($j = 1; $j -le $columnCount; $j++) {
-                                    if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                        Write-Host 'FOUND EXCEL SSN MATCH' -f WHITE
-                                        $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
-                                    }
-                                }
-                            }
-                        }
+                        $SSNPattern = "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$"
+                        $result.SSNMatches = PatternSearchXlsx $filePath $SSNPattern
                     }
                     if (!$noCC)
                     {
-                        foreach ($worksheet in $workBook.Sheets) {
-                            $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
-                            $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
-
-                            for ($i = 1; $i -le $rowCount; $i++) {
-                                for ($j = 1; $j -le $columnCount; $j++) {
-                                    if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                        Write-Host 'FOUND EXCEL CC MATCH' -f WHITE
-                                        $result.CCMatches += ($Matches[0] -replace '\d', 'X')
-                                    }
-                                }
-                            }
-                        }
+                        $CCPatern = "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$"
+                        $result.CCMatches = PatternSearchXlsx $filePath $CCPatern
                     }
-                    $workBook.close($false);
+                    #$workBook.close($false);
                 }
                 elseif ($extension -eq "xls")
                 {
-                    $testFilePath = $filePath + "x"
-                    if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                    if ($global:excel -eq $null -OR $global:excel.workbooks -eq $null)
                     {
+                        #[gc]::collect()
+                        #[gc]::WaitForPendingFinalizers()
+                        $global:excel = new-object -comobject excel.application
+                        $global:excel.Visible = $False
+                        $global:excelSaveFormat = [Microsoft.Office.Interop.Excel.XlFileFormat]::xlWorkbookDefault
+                        $global:excel.DisplayAlerts = $False;
+                        $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
+                        #$global:excel.AutoRecover.Enabled = $false
+                    }
+                    #$testFilePath = $filePath + "x"
+                    #if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                    #{
                         try
                         {
                             $savename = $filePath.ToLower() + 'x'
@@ -775,37 +786,35 @@ function ConvertDocument($path, $file, $saveAs)
                                     }
                                 }
                             }
-                            if (!$noSSN)
-                            {
-                                foreach ($worksheet in $workBook.Sheets) {
-                                    $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
-                                    $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+                            if (!$noSSN -or !$noCC) {
+                                $tempFilePath = "$PSScriptRoot\Temp\$name"
                                 
-                                    for ($i = 1; $i -le $rowCount; $i++) {
-                                        for ($j = 1; $j -le $columnCount; $j++) {
-                                            if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                                Write-Host 'FOUND EXCEL SSN MATCH' -f WHITE
-                                                $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            if (!$noCC)
-                            {
-                                foreach ($worksheet in $workBook.Sheets) {
-                                    $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
-                                    $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+                                $tempSaveName = $tempFilePath.ToLower() + 'x'
 
-                                    for ($i = 1; $i -le $rowCount; $i++) {
-                                        for ($j = 1; $j -le $columnCount; $j++) {
-                                            if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                                Write-Host 'FOUND EXCEL CC MATCH' -f WHITE
-                                                $result.CCMatches += ($Matches[0] -replace '\d', 'X')
-                                            }
-                                        }
-                                    }
+                                if ($workbook.HasVBProject)
+                                {
+                                    $tempSaveName = $tempSaveName -Replace ".xlsx", ".xlsm"
+                                    $workBook.saveas([ref]"$tempSaveName", [ref][Microsoft.Office.Interop.Excel.XlFileFormat]::xlOpenXMLWorkbookMacroEnabled);
+
                                 }
+                                else
+                                {
+                                    $workBook.saveas([ref]"$tempSaveName", [ref]$global:excelSaveFormat)
+                                }
+
+                                if (!$noSSN)
+                                {
+                                    $SSNPattern = "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$"
+                                    $result.SSNMatches = PatternSearchXlsx $tempSaveName $SSNPattern
+                                }
+                                if (!$noCC)
+                                {
+                                    $CCPatern = "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$"
+                                    $result.CCMatches = PatternSearchXlsx $tempSaveName $CCPatern
+                                }
+
+                                Remove-Item -Path $tempSaveName
+
                             }
                             if ($workbook.HasVBProject)
                             {
@@ -861,7 +870,7 @@ function ConvertDocument($path, $file, $saveAs)
                                             for ($j = 1; $j -le $columnCount; $j++) {
                                                 if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
                                                     Write-Host 'FOUND EXCEL SSN MATCH' -f WHITE
-                                                    $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                                    $result.SSNMatches += ($worksheet.Cells.Item($i, $j).Text -replace '\d', 'X')
                                                 }
                                             }
                                         }
@@ -877,7 +886,7 @@ function ConvertDocument($path, $file, $saveAs)
                                             for ($j = 1; $j -le $columnCount; $j++) {
                                                 if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
                                                     Write-Host 'FOUND EXCEL CC MATCH' -f WHITE
-                                                    $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                                    $result.CCMatches += ($worksheet.Cells.Item($i, $j).Text -replace '\d', 'X')
                                                 }
                                             }
                                         }
@@ -895,38 +904,38 @@ function ConvertDocument($path, $file, $saveAs)
                                 else
                                 {
                                     if ($saveAs -eq $true)
+                                    {
+                                        $workBook.saveas([ref]"$tempSaveName", [ref]$global:excelSaveFormat);
+                                    }
+                                }
+                        
+                                $workBook.close($false);
+                                $converted = $true
+                                #copy back to original location
+                                if ($saveAs -eq $true)
                                 {
-                                    $workBook.saveas([ref]"$tempSaveName", [ref]$global:excelSaveFormat);
+                                    Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
+                                }
+                                Remove-Item -Path $tempFilePath 
+                                if ($saveAs -eq $true)
+                                {
+                                    Remove-Item -Path $newTempFilePath 
                                 }
                             }
-                        
-                            $workBook.close($false);
-                            $converted = $true
-                            #copy back to original location
-                            if ($saveAs -eq $true)
+                            else
                             {
-                                Copy-Item ($newTempFilePath)  -Destination ($filePath + "x")
-                            }
-                            Remove-Item -Path $tempFilePath 
-                            if ($saveAs -eq $true)
-                            {
-                                Remove-Item -Path $newTempFilePath 
+                                throw $_
                             }
                         }
-                        else
+                        finally
                         {
-                            throw $_
+                            #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
                         }
-                    }
-                    finally
+                    #}
+                    else
                     {
-                        #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
+                        $oldFormat = $false
                     }
-                }
-                else
-                {
-                    $oldFormat = $false
-                }
                 }
             }
 		}
@@ -939,7 +948,7 @@ function ConvertDocument($path, $file, $saveAs)
             }
             else
             {
-                if ($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null )
+                if (($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null) -and ((!$noLinks -OR !$noSSN -OR !$noCC) -or $extension -eq "doc"))
                 {
                     #[gc]::collect()
                     #[gc]::WaitForPendingFinalizers()
