@@ -143,8 +143,7 @@ $query = "  USE [" + $databaseName + "]
                 [RelativeFolder] [nvarchar](max) NULL,
                 [HasMacro] [bit] NULL,
                 [HasLink] [bit] NULL,
-                [HasSSN] [bit] NULL,
-                [HasCC] [bit] NULL,
+                [HasPattern] [bit] NULL,
                 [OfficeOpen] [bit] NULL,
                 [PathLength] [int] NULL,
                 [Error] [nvarchar](max) NULL,
@@ -307,16 +306,17 @@ SqlQueryInsert($query)
 
 $query = "  USE [" + $databaseName + "]
 
-            /****** Object:  Table [dbo].[ScanSSN]    Script Date: 8/4/2020 11:52:09 AM ******/
+            /****** Object:  Table [dbo].[PatternMatches]    Script Date: 8/4/2020 11:52:09 AM ******/
             SET ANSI_NULLS ON
 
             SET QUOTED_IDENTIFIER ON
 
-            CREATE TABLE [dbo].[ScanSSN](
+            CREATE TABLE [dbo].[ScanMatches](
                 [Id] [int] IDENTITY(1,1) NOT NULL,
                 [OwnerId] [int] NULL,
                 [FileId] [int] NULL,
                 [Match] [nvarchar](max) NULL,
+                [PatternName] [nvarchar](max) NULL,
                 [Created] [datetime2](7) NULL
             ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
 
@@ -324,17 +324,15 @@ SqlQueryInsert($query)
 
 $query = "  USE [" + $databaseName + "]
 
-            /****** Object:  Table [dbo].[ScanCC]    Script Date: 8/4/2020 11:52:09 AM ******/
+            /****** Object:  Table [dbo].[ScanPatterns]    Script Date: 8/4/2020 11:52:09 AM ******/
             SET ANSI_NULLS ON
 
             SET QUOTED_IDENTIFIER ON
 
-            CREATE TABLE [dbo].[ScanCC](
+            CREATE TABLE [dbo].[ScanPatterns](
                 [Id] [int] IDENTITY(1,1) NOT NULL,
-                [OwnerId] [int] NULL,
-                [FileId] [int] NULL,
-                [Match] [nvarchar](max) NULL,
-                [Created] [datetime2](7) NULL
+                [Name] [nvarchar](max) NULL,
+                [Pattern] [nvarchar](max) NULL
             ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]"
 
 SqlQueryInsert($query)
