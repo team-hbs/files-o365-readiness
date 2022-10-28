@@ -113,7 +113,7 @@ $sqlOverall = "SELECT ScanJob.Id,
 	OldOfficeCount,
 	PathLengthCount, 
 	NoAccessCount, 
-	CreatedDate
+	ScanJob.CreatedDate as CreatedDate
 	FROM Source,ScanJob 
 	WHERE Source.Id = ScanJob.OwnerId
 	AND	ScanJob.OwnerId = {OWNER_ID}"
@@ -193,7 +193,7 @@ foreach($report in $reports)
 				$result.Extensions = $result.Extensions.SubString(0,3000)
 			}
 			$unixEpoch = Get-Date -Date "01/01/1970"
-			$result.CreatedDate =  $result.CreatedDate
+			#$result.CreatedDate =  $result.CreatedDate
 		}
         foreach($row in $result)
         {

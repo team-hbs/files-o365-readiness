@@ -12,10 +12,13 @@
     [int]$batchNumber = -1,
 	[int[]]$importBatch = -1,
     [int]$sourceId = -1,
+    [string] $lastModifiedDate = '01/01/2099',
 	[boolean]$encrypt = $false
 )
 
 $global:LinkCounter = 0
+
+$lastModifiedDate = get-date $lastModifiedDate
 
 $commonPath = $PSScriptRoot + "\common.ps1"
 . $commonPath
@@ -767,19 +770,28 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
             $ownerId = $row.Id
 			if ($mode -eq "LastModifiedScan")
 			{
-				$query = "SELECT TOP 1 * FROM MigrationJob Where OwnerId = $ownerId ORDER BY CreatedDate DESC"
-				$migrationJob = SqlQueryReturn($query)
-				if ($migrationJob -ne $null)
-				{
-					$lastModifiedDate = $migrationJob.CreatedDate
-				}
+                if ($lastModifiedDate -ne (Get-Date '01/01/2099'))
+                {
+				    $query = "SELECT TOP 1 * FROM MigrationJob Where OwnerId = $ownerId ORDER BY CreatedDate DESC"
+				    $migrationJob = SqlQueryReturn($query)
+				    if ($migrationJob -ne $null)
+				    {
+					    $lastModifiedDate = $migrationJob.CreatedDate
+				    }
+                }
 			}
-			if ($lastModifiedDate -eq $null)
+			if ($mode -eq "Scan")
 			{
 				#start office monitor
+                write-host "Starting Normal Scan for" $path -f Cyan
                 OfficeMonitor
 				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC
 			}
+            elseif($mode -eq "LastModifiedScan")
+            {
+                write-host "Starting LastModifiedScan Scan for" $path -f Cyan
+                InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $true -noLinks $noLinks -noSSN $noSSN -noCC $noCC -lastModifiedDate $lastModifiedDate
+            }
 			else
 			{
                 $scanJobQuery = "SELECT * FROM ScanJob WHERE OwnerId = $ownerId"

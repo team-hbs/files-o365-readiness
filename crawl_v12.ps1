@@ -932,10 +932,10 @@ function ConvertDocument($path, $file, $saveAs)
                             #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
                         }
                     #}
-                    else
-                    {
-                        $oldFormat = $false
-                    }
+                    #else
+                    #{
+                    #    $oldFormat = $false
+                    #}
                 }
             }
 		}
