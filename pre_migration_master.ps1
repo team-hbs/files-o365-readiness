@@ -235,27 +235,17 @@ function InitPreMigrationMaster($directory) {
 		$noLinks = $false
 	}
 
-	$noSSNValue = [String] (GetConfig('NoSSN') )
-    if ($noSSNValue -eq 'true')
+	$noPatternMatchValue = [String] (GetConfig('NoPatternMatch') )
+    if ($noPatternMatchValue -eq 'true')
     {
-		$noSSN = $true
+		$noPatternMatch = $true
 	}
 	else
 	{
-		$noSSN = $false
-	}
-
-	$noCCValue = [String] (GetConfig('NoCC') )
-    if ($noCCValue -eq 'true')
-    {
-		$noCC = $true
-	}
-	else
-	{
-		$noCC = $false
+		$noPatternMatch = $false
 	}
 	
-	$errors = InitCrawl $ownerId $path $false $noOffice $noLinks $noSSN $noCC | Select-Object FileName,Message,ParentFolderCurrent, Query
+	$errors = InitCrawl $ownerId $path $false $noOffice $noLinks $noPatternMatch | Select-Object FileName,Message,ParentFolderCurrent, Query
 	if ($global:currentErrorCount -gt 0) {
 		$errors | Export-Csv $logFile
 	}
@@ -653,12 +643,10 @@ elseif($mode -eq 'Clear')
 			$query = "DELETE FROM ScanLink WHERE OwnerId = $ownerId"
 			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
-			$query = "DELETE FROM ScanSSN WHERE OwnerId = $ownerId"
+			$query = "DELETE FROM ScanMatches WHERE OwnerId = $ownerId"
 			write-host $query -ForegroundColor Green
             SqlQueryInsert $query
-			$query = "DELETE FROM ScanCC WHERE OwnerId = $ownerId"
-			write-host $query -ForegroundColor Green
-            SqlQueryInsert $query
+
         }
     }
     elseif($ownerId -ne -1)
@@ -672,12 +660,10 @@ elseif($mode -eq 'Clear')
 		$query = "DELETE FROM ScanLink WHERE OwnerId = $ownerId"
 		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
-		$query = "DELETE FROM ScanSSN WHERE OwnerId = $ownerId"
+		$query = "DELETE FROM ScanMatches WHERE OwnerId = $ownerId"
 		write-host $query -ForegroundColor Green
         SqlQueryInsert $query
-		$query = "DELETE FROM ScanCC WHERE OwnerId = $ownerId"
-		write-host $query -ForegroundColor Green
-        SqlQueryInsert $query
+
     }
 }
 elseif($mode -eq 'CleanUp')
@@ -742,24 +728,14 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			$noLinks = $false
 		}
 
-		$noSSNValue = [String] (GetConfig('NoSSN') )
-		if ($noSSNValue -eq 'true')
+		$noPatternMatchValue = [String] (GetConfig('NoPatternMatch') )
+		if ($noPatternMatchValue -eq 'true')
 		{
-			$noSSN = $true
+			$noPatternMatch = $true
 		}
 		else
 		{
-			$noSSN = $false
-		}
-
-		$noCCValue = [String] (GetConfig('NoCC') )
-		if ($noCCValue -eq 'true')
-		{
-			$noCC = $true
-		}
-		else
-		{
-			$noCC = $false
+			$noPatternMatch = $false
 		}
 
         foreach($row in $source)
@@ -785,7 +761,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 				#start office monitor
                 write-host "Starting Normal Scan for" $path -f Cyan
                 OfficeMonitor
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noPatternMatch $noPatternMatch
 			}
             elseif($mode -eq "LastModifiedScan")
             {
@@ -803,7 +779,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
                     #$source = SqlQueryReturn($query)
 			        #start office monitor
                     OfficeMonitor
-				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC -lastModifiedDate $lastModifiedDate
+				    InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noPatternMatch $noPatternMatch -lastModifiedDate $lastModifiedDate
                 }
                 else
                 {
@@ -842,24 +818,14 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			$noLinks = $false
 		}
 
-		$noSSNValue = [String] (GetConfig('NoSSN') )
-		if ($noSSNValue -eq 'true')
+		$noPatternMatchValue = [String] (GetConfig('NoPatternMatch') )
+		if ($noPatternMatchValue -eq 'true')
 		{
-			$noSSN = $true
+			$noPatternMatch = $true
 		}
 		else
 		{
-			$noSSN = $false
-		}
-
-		$noCCValue = [String] (GetConfig('NoCC') )
-		if ($noCCValue -eq 'true')
-		{
-			$noCC = $true
-		}
-		else
-		{
-			$noCC = $false
+			$noPatternMatch = $false
 		}
 
         foreach($row in $source)
@@ -878,11 +844,11 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			}
 			if ($lastModifiedDate -eq $null)
 			{
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noPatternMatch $noPatternMatch
 			}
 			else
 			{
-				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noSSN $noSSN -noCC $noCC -lastModifiedDate $lastModifiedDate
+				InitCrawl -ownerId $ownerId -startPath $path -doConvert $false -noOffice $noOffice -noLinks $noLinks -noPatternMatch $noPatternMatch -lastModifiedDate $lastModifiedDate
 			}
             $currentDirectory++
         }
@@ -917,24 +883,14 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 			$noLinks = $false
 		}
 
-		$noSSNValue = [String] (GetConfig('NoSSN') )
-		if ($noSSNValue -eq 'true')
+		$noPatternMatchValue = [String] (GetConfig('NoPatternMatch') )
+		if ($noPatternMatchValue -eq 'true')
 		{
-			$noSSN = $true
+			$noPatternMatch = $true
 		}
 		else
 		{
-			$noSSN = $false
-		}
-
-		$noCCValue = [String] (GetConfig('NoCC') )
-		if ($noCCValue -eq 'true')
-		{
-			$noCC = $true
-		}
-		else
-		{
-			$noCC = $false
+			$noPatternMatch = $false
 		}
 
         foreach($row in $source)
@@ -943,7 +899,7 @@ elseif ($mode -eq "Scan" -OR $mode -eq "LastModifiedScan")
 	    	$currentDirectory++
             $path = $row.ADHomeDirectory
 			$ownerId = $row.Id
-            InitCrawl $ownerId $path $false $noOffice $noLinks $noSSN $noCC
+            InitCrawl $ownerId $path $false $noOffice $noLinks $noPatternMatch
             $currentDirectory++
         }
     }

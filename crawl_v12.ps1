@@ -3,8 +3,16 @@ $global:DataSource = $PSScriptRoot + "\FilesToO365.db"
 $global:LastModifiedDate = $null
 
 #function InitCrawl($ownerId, $email, $startPath, $doConvert)
-function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $noLinks, $noSSN, $noCC, $lastModifiedDate)
+function InitCrawl($ownerId, $startPath, $doConvert, $noOffice, $noLinks, $noPatternMatch, $lastModifiedDate)
 {
+
+    [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing")
+    [System.Reflection.Assembly]::LoadWithPartialName("System.Xml")
+    [System.Reflection.Assembly]::LoadWithPartialName("System.Security")
+
+    Add-Type -Path "$PSScriptRoot\BouncyCastle.Crypto.dll"
+    Add-Type -Path "$PSScriptRoot\itextsharp.dll"
+
 	if ($lastModifiedDate -eq $null)
 	{
 		AddEvent -ownerId $ownerId -eventType 'ScanStarted'
@@ -472,8 +480,7 @@ function ConvertDocument($path, $file, $saveAs)
     $result = New-Object -TypeName psobject 
     $result | Add-Member -MemberType NoteProperty -Name HasMacro -Value $false
     $result | Add-Member -MemberType NoteProperty -Name Links -Value @()
-    $result | Add-Member -MemberType NoteProperty -Name SSNMatches -Value @()
-    $result | Add-Member -MemberType NoteProperty -Name CCMatches -Value @()
+    $result | Add-Member -MemberType NoteProperty -Name PatternMatches -Value @()
     $result | Add-Member -MemberType NoteProperty -Name ConvertMessage -Value ""
     $result | Add-Member -MemberType NoteProperty -Name ConvertSuccess -Value $false
 
@@ -500,7 +507,7 @@ function ConvertDocument($path, $file, $saveAs)
             if ($noOffice) {
                 Write-Host "NO OFFICE MODE" -ForegroundColor Black -BackgroundColor White
             } else {
-                if (($global:word -eq $null -OR $global:word.documents -eq $null) -and ((!$noLinks -OR !$noSSN -OR !$noCC) -or $extension -eq "doc"))
+                if (($global:word -eq $null -OR $global:word.documents -eq $null) -and ((!$noLinks -OR !$noPatternMatch) -or $extension -eq "doc"))
                 {
                     #[gc]::collect()
                     #[gc]::WaitForPendingFinalizers()
@@ -516,7 +523,7 @@ function ConvertDocument($path, $file, $saveAs)
                 if ($extension -eq "docx")
                 {
                     $opendoc = $null
-                    if (!$noLinks -OR !$noSSN -OR !$noCC)
+                    if (!$noLinks -OR !$noPatternMatch)
                     {
                         $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
                     
@@ -532,21 +539,21 @@ function ConvertDocument($path, $file, $saveAs)
                                 }
                             }
                         }
-                        if (!$noSSN)
+                        if (!$noPatternMatch)
                         {
-                            foreach ($paragraph in $opendoc.Paragraphs) {
-                                if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                    Write-Host 'FOUND WORD SSN MATCH' -f WHITE
-                                    $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
-                                }
-                            }
-                        }
-                        if (!$noCC)
-                        {
-                            foreach ($paragraph in $opendoc.Paragraphs) {
-                                if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                    Write-Host 'FOUND WORD CC MATCH' -f WHITE
-                                    $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                            $query = "SELECT * FROM ScanPatterns"
+                            $PatternsResult = SqlQueryReturn($query)
+                            Foreach ($row in $PatternsResult) 
+                            {
+                                foreach ($paragraph in $opendoc.Paragraphs) {
+                                    if ($paragraph.Range.Text -match $row.Pattern) {
+                                        Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                                        $PatternMatch = New-Object PSObject
+                                        $PatternMatch | add-member Noteproperty -Name Match -Value ($Matches[0] -replace '\d', 'X')
+                                        $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                        $result.PatternMatches += $PatternMatch
+                                    }
                                 }
                             }
                         }
@@ -586,21 +593,21 @@ function ConvertDocument($path, $file, $saveAs)
                                     }
                                 }
                             }
-                            if (!$noSSN)
+                            if (!$noPatternMatch)
                             {
-                                foreach ($paragraph in $opendoc.Paragraphs) {
-                                    if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                        Write-Host 'FOUND WORD SSN MATCH' -f WHITE
-                                        $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
-                                    }
-                                }
-                            }
-                            if (!$noCC)
-                            {
-                                foreach ($paragraph in $opendoc.Paragraphs) {
-                                    if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                        Write-Host 'FOUND WORD CC MATCH' -f WHITE
-                                        $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                $query = "SELECT * FROM ScanPatterns"
+                                $PatternsResult = SqlQueryReturn($query)
+                                Foreach ($row in $PatternsResult) 
+                                {
+                                    foreach ($paragraph in $opendoc.Paragraphs) {
+                                        if ($paragraph.Range.Text -match $row.Pattern) {
+                                            Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                                            $PatternMatch = New-Object PSObject
+                                            $PatternMatch | add-member Noteproperty -Name Match -Value ($Matches[0] -replace '\d', 'X')
+                                            $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                            $result.PatternMatches += $PatternMatch
+                                        }
                                     }
                                 }
                             }
@@ -643,21 +650,21 @@ function ConvertDocument($path, $file, $saveAs)
                                         }
                                     }
                                 }
-                                if (!$noSSN)
+                                if (!$noPatternMatch)
                                 {
-                                    foreach ($paragraph in $opendoc.Paragraphs) {
-                                        if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                            Write-Host 'FOUND WORD SSN MATCH' -f WHITE
-                                            $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
-                                        }
-                                    }
-                                }
-                                if (!$noCC)
-                                {
-                                    foreach ($paragraph in $opendoc.Paragraphs) {
-                                        if ($paragraph.Range.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                            Write-Host 'FOUND WORD CC MATCH' -f WHITE
-                                            $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                    $query = "SELECT * FROM ScanPatterns"
+                                    $PatternsResult = SqlQueryReturn($query)
+                                    Foreach ($row in $PatternsResult) 
+                                    {
+                                        foreach ($paragraph in $opendoc.Paragraphs) {
+                                            if ($paragraph.Range.Text -match $row.Pattern) {
+                                                Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                                                $PatternMatch = New-Object PSObject
+                                                $PatternMatch | add-member Noteproperty -Name Match -Value ($Matches[0] -replace '\d', 'X')
+                                                $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                                $result.PatternMatches += $PatternMatch
+                                            }
                                         }
                                     }
                                 }
@@ -739,15 +746,20 @@ function ConvertDocument($path, $file, $saveAs)
                         
                     }
                     #>
-                    if (!$noSSN)
+                    if (!$noPatternMatch)
                     {
-                        $SSNPattern = "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$"
-                        $result.SSNMatches = PatternSearchXlsx $filePath $SSNPattern
-                    }
-                    if (!$noCC)
-                    {
-                        $CCPatern = "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$"
-                        $result.CCMatches = PatternSearchXlsx $filePath $CCPatern
+                        $query = "SELECT * FROM ScanPatterns"
+                        $PatternsResult = SqlQueryReturn($query)
+                        Foreach ($row in $PatternsResult) 
+                        {
+                            Foreach ($match in (PatternSearchXlsx $filePath $row.Pattern))
+                                {
+                                    $PatternMatch = New-Object PSObject
+                                    $PatternMatch | add-member Noteproperty -Name Match -Value $match
+                                    $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                    $result.PatternMatches += $PatternMatch
+                                }
+                        }
                     }
                     #$workBook.close($false);
                 }
@@ -764,9 +776,9 @@ function ConvertDocument($path, $file, $saveAs)
                         $global:excel.AutomationSecurity = 'msoAutomationSecurityForceDisable'
                         #$global:excel.AutoRecover.Enabled = $false
                     }
-                    #$testFilePath = $filePath + "x"
-                    #if ([System.IO.File]::Exists($testFilePath) -eq $false)
-                    #{
+                    $testFilePath = $filePath + "x"
+                    if ([System.IO.File]::Exists($testFilePath) -eq $false)
+                    {
                         try
                         {
                             $savename = $filePath.ToLower() + 'x'
@@ -786,7 +798,7 @@ function ConvertDocument($path, $file, $saveAs)
                                     }
                                 }
                             }
-                            if (!$noSSN -or !$noCC) {
+                            if (!$noPatternMatch) {
                                 $tempFilePath = "$PSScriptRoot\Temp\$name"
                                 
                                 $tempSaveName = $tempFilePath.ToLower() + 'x'
@@ -801,18 +813,22 @@ function ConvertDocument($path, $file, $saveAs)
                                 {
                                     $workBook.saveas([ref]"$tempSaveName", [ref]$global:excelSaveFormat)
                                 }
-
-                                if (!$noSSN)
+                                
+                                $query = "SELECT * FROM ScanPatterns"
+                                $PatternsResult = SqlQueryReturn($query)
+                                Foreach ($row in $PatternsResult) 
                                 {
-                                    $SSNPattern = "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$"
-                                    $result.SSNMatches = PatternSearchXlsx $tempSaveName $SSNPattern
-                                }
-                                if (!$noCC)
-                                {
-                                    $CCPatern = "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$"
-                                    $result.CCMatches = PatternSearchXlsx $tempSaveName $CCPatern
-                                }
+                                    Foreach ($match in (PatternSearchXlsx $tempSaveName $row.Pattern))
+                                        {
+                                            Write-Host 'FOUND PATTERN MATCH' -f WHITE
 
+                                            $PatternMatch = New-Object PSObject
+                                            $PatternMatch | add-member Noteproperty -Name Match -Value $match
+                                            $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                            $result.PatternMatches += $PatternMatch
+                                        }
+                                }
+                                
                                 Remove-Item -Path $tempSaveName
 
                             }
@@ -860,38 +876,32 @@ function ConvertDocument($path, $file, $saveAs)
                                         }
                                     }
                                 }
-                                if (!$noSSN)
+                                if (!$noPatternMatch)
                                 {
-                                    foreach ($worksheet in $workBook.Sheets) {
-                                        $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
-                                        $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
-                                    
-                                        for ($i = 1; $i -le $rowCount; $i++) {
-                                            for ($j = 1; $j -le $columnCount; $j++) {
-                                                if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                                    Write-Host 'FOUND EXCEL SSN MATCH' -f WHITE
-                                                    $result.SSNMatches += ($worksheet.Cells.Item($i, $j).Text -replace '\d', 'X')
+                                    $query = "SELECT * FROM ScanPatterns"
+                                    $PatternsResult = SqlQueryReturn($query)
+                                    Foreach ($row in $PatternsResult) 
+                                    {
+                                        foreach ($worksheet in $workBook.Sheets) {
+                                            $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
+                                            $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
+                                            
+                                            for ($i = 1; $i -le $rowCount; $i++) {
+                                                for ($j = 1; $j -le $columnCount; $j++) {
+                                                    if ($worksheet.Cells.Item($i, $j).Text -match $row.Pattern) {
+                                                        Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                                                        $PatternMatch = New-Object PSObject
+                                                        $PatternMatch | add-member Noteproperty -Name Match -Value ($worksheet.Cells.Item($i, $j).Text -replace '\d', 'X')
+                                                        $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                                        $result.PatternMatches += $PatternMatch
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                                if (!$noCC)
-                                {
-                                    foreach ($worksheet in $workBook.Sheets) {
-                                        $rowCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Row
-                                        $columnCount = $worksheet.UsedRange[$worksheet.UsedRange.Count].Column
-                                        
-                                        for ($i = 1; $i -le $rowCount; $i++) {
-                                            for ($j = 1; $j -le $columnCount; $j++) {
-                                                if ($worksheet.Cells.Item($i, $j).Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                                    Write-Host 'FOUND EXCEL CC MATCH' -f WHITE
-                                                    $result.CCMatches += ($worksheet.Cells.Item($i, $j).Text -replace '\d', 'X')
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                
                                 if ($workbook.HasVBProject)
                                 {
                                     $result.HasMacro = $true
@@ -931,11 +941,11 @@ function ConvertDocument($path, $file, $saveAs)
                         {
                             #Stop-Process -Name "EXCEL" -Force -ErrorAction SilentlyContinue
                         }
-                    #}
-                    #else
-                    #{
-                    #    $oldFormat = $false
-                    #}
+                    }
+                    else
+                    {
+                        $oldFormat = $false
+                    }
                 }
             }
 		}
@@ -948,7 +958,7 @@ function ConvertDocument($path, $file, $saveAs)
             }
             else
             {
-                if (($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null) -and ((!$noLinks -OR !$noSSN -OR !$noCC) -or $extension -eq "doc"))
+                if (($global:powerpoint -eq $null -OR $global:powerpoint.Presentations -eq $null) -and ((!$noLinks -OR !$noPatternMatch) -or $extension -eq "ppt"))
                 {
                     #[gc]::collect()
                     #[gc]::WaitForPendingFinalizers()
@@ -976,28 +986,28 @@ function ConvertDocument($path, $file, $saveAs)
                             }
                         }
                     }
-                    if (!$noSSN)
+                    if (!$noPatternMatch)
                     {
-                        foreach ($slide in $presentation.Slides) {
-                            foreach ($shape in $slide.Shapes) {
-                                if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                    Write-Host 'FOUND POWERPOINT SSN MATCH' -f WHITE
-                                    $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                        $query = "SELECT * FROM ScanPatterns"
+                        $PatternsResult = SqlQueryReturn($query)
+                        Foreach ($row in $PatternsResult) 
+                        {
+                            foreach ($slide in $presentation.Slides) {
+                                foreach ($shape in $slide.Shapes) {
+                                    if ($shape.TextFrame.TextRange.Text -match $row.Pattern) {
+                                        Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                                        $PatternMatch = New-Object PSObject
+                                        $PatternMatch | add-member Noteproperty -Name Match -Value ($Matches[0] -replace '\d', 'X')
+                                        $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                        $result.PatternMatches += $PatternMatch
+
+                                    }
                                 }
                             }
                         }
                     }
-                    if (!$noCC)
-                    {
-                        foreach ($slide in $presentation.Slides) {
-                            foreach ($shape in $slide.Shapes) {
-                                if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                    Write-Host 'FOUND POWERPOINT CC MATCH' -f WHITE
-                                    $result.CCMatches += ($Matches[0] -replace '\d', 'X')
-                                }
-                            }
-                        }
-                    }
+                    
                     $presentation.close()
                 }
                 elseif ($extension -eq 'ppt')
@@ -1025,28 +1035,28 @@ function ConvertDocument($path, $file, $saveAs)
                                     }
                                 }
                             }
-                            if (!$noSSN)
+                            if (!$noPatternMatch)
                             {
-                                foreach ($slide in $presentation.Slides) {
-                                    foreach ($shape in $slide.Shapes) {
-                                        if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                            Write-Host 'FOUND POWERPOINT SSN MATCH' -f WHITE
-                                            $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
+                                $query = "SELECT * FROM ScanPatterns"
+                                $PatternsResult = SqlQueryReturn($query)
+                                Foreach ($row in $PatternsResult) 
+                                {
+                                    foreach ($slide in $presentation.Slides) {
+                                        foreach ($shape in $slide.Shapes) {
+                                            if ($shape.TextFrame.TextRange.Text -match $row.Pattern) {
+                                                Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                                                $PatternMatch = New-Object PSObject
+                                                $PatternMatch | add-member Noteproperty -Name Match -Value ($Matches[0] -replace '\d', 'X')
+                                                $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                                $result.PatternMatches += $PatternMatch
+
+                                            }
                                         }
                                     }
                                 }
                             }
-                            if (!$noCC)
-                            {
-                                foreach ($slide in $presentation.Slides) {
-                                    foreach ($shape in $slide.Shapes) {
-                                        if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                            Write-Host 'FOUND POWERPOINT CC MATCH' -f WHITE
-                                            $result.CCMatches += ($Matches[0] -replace '\d', 'X')
-                                        }
-                                    }
-                                }
-                            }
+
                             if ($saveAs -eq $true)
                             {
                                 $presentation.saveas([ref]"$savename", [ref]$global:powerpointSaveFormat);
@@ -1079,24 +1089,23 @@ function ConvertDocument($path, $file, $saveAs)
                                         }
                                     }
                                 }
-                                if (!$noSSN)
+                                if (!$noPatternMatch)
                                 {
-                                    foreach ($slide in $presentation.Slides) {
-                                        foreach ($shape in $slide.Shapes) {
-                                            if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{3}[-|.\s]*\d{2}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                                Write-Host 'FOUND POWERPOINT SSN MATCH' -f WHITE
-                                                $result.SSNMatches += ($Matches[0] -replace '\d', 'X')
-                                            }
-                                        }
-                                    }
-                                }
-                                if (!$noCC)
-                                {
-                                    foreach ($slide in $presentation.Slides) {
-                                        foreach ($shape in $slide.Shapes) {
-                                            if ($shape.TextFrame.TextRange.Text -match "^(\D*|.*\D+)\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}[-|.\s]*\d{4}(\D*|\D+.*)$") {
-                                                Write-Host 'FOUND POWERPOINT CC MATCH' -f WHITE
-                                                $result.CCMatches += ($Matches[0] -replace '\d', 'X')
+                                    $query = "SELECT * FROM ScanPatterns"
+                                    $PatternsResult = SqlQueryReturn($query)
+                                    Foreach ($row in $PatternsResult) 
+                                    {
+                                        foreach ($slide in $presentation.Slides) {
+                                            foreach ($shape in $slide.Shapes) {
+                                                if ($shape.TextFrame.TextRange.Text -match $row.Pattern) {
+                                                    Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                                                    $PatternMatch = New-Object PSObject
+                                                    $PatternMatch | add-member Noteproperty -Name Match -Value ($Matches[0] -replace '\d', 'X')
+                                                    $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                                                    $result.PatternMatches += $PatternMatch
+
+                                                }
                                             }
                                         }
                                     }
@@ -1132,6 +1141,33 @@ function ConvertDocument($path, $file, $saveAs)
                         $oldFormat = $false
                     }
                 }
+            }
+        }
+        elseif ($extension -eq "pdf")
+		{
+            $oldFormat = $true
+            if (!$noPatternMatch)
+            {
+                $pdf = New-Object iTextSharp.text.pdf.pdfreader -ArgumentList $filePath
+
+                $query = "SELECT * FROM ScanPatterns"
+                $PatternsResult = SqlQueryReturn($query)
+                Foreach ($row in $PatternsResult) 
+                {
+                    for($counter = 1; $counter -le $pdf.NumberOfPages; $counter++)
+                    {
+                        $text = [iTextSharp.text.pdf.parser.PdfTextExtractor]::GetTextFromPage($pdf, $counter)
+
+                        if ($text -match $row.Pattern) {
+                            Write-Host 'FOUND PATTERN MATCH' -f WHITE
+
+                            $PatternMatch = New-Object PSObject
+                            $PatternMatch | add-member Noteproperty -Name Match -Value ($Matches[0] -replace '\d', 'X')
+                            $PatternMatch | add-member Noteproperty -Name PatternName -Value $row.Name 
+                            $result.PatternMatches += $PatternMatch
+                        }
+                    }
+                }   
             }
         }
 	}
@@ -1552,12 +1588,12 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
         $result = New-Object -TypeName psobject 
         $result | Add-Member -MemberType NoteProperty -Name HasMacro -Value $false
         $result | Add-Member -MemberType NoteProperty -Name Links -Value @()
-        $result | Add-Member -MemberType NoteProperty -Name SSNMatches -Value @()
-        $result | Add-Member -MemberType NoteProperty -Name CCMatches -Value @()
+        $result | Add-Member -MemberType NoteProperty -Name PatterMatches -Value @()
         $result | Add-Member -MemberType NoteProperty -Name ConvertMessage -Value $line.ToString() + ":" + $_.Exception.Message
         $result | Add-Member -MemberType NoteProperty -Name ConvertSuccess -Value $false
 
     }
+
     $path = $path -Replace "'", "''"
     $tempFilePath = $path + "\" + $file.Name
     $tempFilePathLength = $tempFilePath.Length
@@ -1566,8 +1602,7 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
     $convertMessage = $result.ConvertMessage
     $hasMacroValue = 0
     $hasLinkValue = 0
-    $hasSSNValue = 0
-    $hasCCValue = 0
+    $hasPatternValue = 0
     $convertSuccessValue = 0
 
     if ($result.HasMacro -eq $true)
@@ -1578,13 +1613,9 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
     {
         $hasLinkValue = 1
     }
-    if ($result.SSNMatches.Length -gt 0)
+    if ($result.PaternMatches.Length -gt 0)
     {
-        $hasSSNValue = 1
-    }
-    if ($result.CCMatches.Length -gt 0)
-    {
-        $hasCCValue = 1
+        $hasPatternValue = 1
     }
     if ($result.ConvertSuccess -eq $true)
     {
@@ -1669,16 +1700,16 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
         {
             $createdValue = (Get-Date $Created).ToString('yyyy-MM-dd HH:mm:ss')
             $modifiedValue = (Get-Date $Modified).ToString('yyyy-MM-dd HH:mm:ss')
-            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink, HasSSN, HasCC,"
+            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink, HasPattern,"
 		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20,ScanCreatedDate) "
-		    $query += " VALUES ('$FileName', '$createdValue', '$modifiedValue', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$hasLinkValue,$hasSSNValue,$hasCCValue,"
+		    $query += " VALUES ('$FileName', '$createdValue', '$modifiedValue', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$hasLinkValue,$hasPatternValue,"
 		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20','$scanCreatedDate')"
         }
         else
         {
-            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink, HasSSN, HasCC,"
+            $query = "INSERT INTO $filesTableName (FileName, Created, Modified, Author, Extension, Size, OwnerId, Ignore, Path, FolderDepth, ParentFolder, RelativeFolder,OfficeOpen,Error,PathLength, HasMacro, HasLink, HasPattern,"
 		    $query += "Folder01, Folder02, Folder03, Folder04, Folder05, Folder06, Folder07, Folder08, Folder09, Folder10, Folder11, Folder12, Folder13, Folder14, Folder15, Folder16, Folder17, Folder18, Folder19, Folder20,ScanCreatedDate) "
-		    $query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$hasLinkValue,$hasSSNValue,$hasCCValue,"
+		    $query += " VALUES ('$FileName', '$createdSeconds', '$modifiedSeconds', '$Author', '$Extension', '$Size', $ownerId, '$Ignore', '$Path', '$FolderDepth','$tempParentFolderCurrent', '$RelativeFolder',$convertSuccessValue,'$convertMessage',$tempFilePathLength,$hasMacroValue,$hasLinkValue,$hasPatternValue,"
 		    $query += " '$Folder01', '$Folder02', '$Folder03', '$Folder04', '$Folder05', '$Folder06', '$Folder07', '$Folder08', '$Folder09', '$Folder10', '$Folder11', '$Folder12', '$Folder13', '$Folder14', '$Folder15', '$Folder16', '$Folder17', '$Folder18', '$Folder19', '$Folder20','$scanCreatedDate')"
         }
 		
@@ -1687,17 +1718,18 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
         write-host $query -ForegroundColor Green
 		$rowsAffected = SqlQueryInsert($query)
 
+
+        $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
+        $sqlResult = SqlQueryReturn($query)
+        foreach ($row in $sqlResult)
+        {
+            $fileId = $row.Id
+        }
+        
         if (!$noLinks)
         {
             if ($hasLinkValue)
             {
-                $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
-                $sqlResult = SqlQueryReturn($query)
-                foreach ($row in $sqlResult)
-                {
-                    $fileId = $row.Id
-                }
-
                 foreach ($link in $result.Links)
                 {
                     if ($link -ne $null -AND $link.Trim() -ne '')
@@ -1709,50 +1741,22 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
                 }
             }
         }
-        if (!$noSSN)
+        if (!$noPatternMatch)
         {
-            if ($hasSSNValue)
+            if ($hasPatternValue)
             {
-                $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
-                $sqlResult = SqlQueryReturn($query)
-                foreach($row in $sqlResult)
+                For ($i=1; $i -lt $result.PatternMatches.Length; $i++)
                 {
-                    $fileId = $row.Id
+                    
+                    $created = Get-Date
+                    $query = "INSERT INTO ScanMatches (OwnerID,FileId,Match,PatternName,Created) VALUES ($ownerId,$fileId,'$($result.PatternMatches[$i].Match)','$($result.PatternMatches[$i].PatternName)','$created')"
+                    Write-Host $query -ForegroundColor Green
+                    SqlQueryInsert -query $query
                 }
 
-                foreach ($match in $result.SSNMatches)
-                {
-                    if ($match -ne $null -AND $match.Trim() -ne '')
-                    {
-                        $created = Get-Date
-                        $query = "INSERT INTO ScanSSN (Match,OwnerId,FileId,Created) VALUES ('$match',$ownerId,$fileId,'$created')"
-                        SqlQueryInsert -query $query
-                    }
-                }
             }
         }
-        if (!$noCC)
-        {
-            if ($hasCCValue)
-            {
-                $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
-                $sqlResult = SqlQueryReturn($query)
-                foreach($row in $sqlResult)
-                {
-                    $fileId = $row.Id
-                }
 
-                foreach ($match in $result.CCMatches)
-                {
-                    if ($match -ne $null -AND $match.Trim() -ne '')
-                    {
-                        $created = Get-Date
-                        $query = "INSERT INTO ScanCC (Match,OwnerId,FileId,Created) VALUES ('$match',$ownerId,$fileId,'$created')"
-                        SqlQueryInsert -query $query
-                    }
-                }
-            }
-        }
 		#New-Object -TypeName PsObject -Property @{FileName=$fileName;Message="success";ParentFolderCurrent=$parentFolderCurrent;Query=$query}
 	}
 	catch
