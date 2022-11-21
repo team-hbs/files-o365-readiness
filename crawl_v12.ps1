@@ -1718,14 +1718,16 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
         write-host $query -ForegroundColor Green
 		$rowsAffected = SqlQueryInsert($query)
 
-
-        $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
-        $sqlResult = SqlQueryReturn($query)
-        foreach ($row in $sqlResult)
+        if (!$noLinks -OR !$noPatternMatch)
         {
+           $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
+           $sqlResult = SqlQueryReturn($query)
+           foreach ($row in $sqlResult)
+           {
             $fileId = $row.Id
+           }
         }
-        
+
         if (!$noLinks)
         {
             if ($hasLinkValue)
