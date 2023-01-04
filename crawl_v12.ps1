@@ -525,6 +525,7 @@ function ConvertDocument($path, $file, $saveAs)
                     $opendoc = $null
                     if (!$noLinks -OR !$noPatternMatch)
                     {
+                        write-host 'Looking for Links:' !$noLinks 'Looking for Patterns' !$noPatternMatch
                         $opendoc = $global:word.documents.OpenNoRepairDialog($filePath,$false,$true,$false,'')
                     
                         if (!$noLinks)
@@ -1720,6 +1721,7 @@ function InsertRow($file, $path, $ownerId, $currentDepth)
 
         if (!$noLinks -OR !$noPatternMatch)
         {
+           write-host 'Querying for Links:' !$noLinks 'Querying for Patterns' !$noPatternMatch -f White
            $query = "SELECT Id FROM $filesTableName WHERE FileName = '$FileName' AND Path = '$Path'"
            $sqlResult = SqlQueryReturn($query)
            foreach ($row in $sqlResult)
