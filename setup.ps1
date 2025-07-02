@@ -14,8 +14,8 @@ unblock-file -path .\OfficeMonitor.ps1
 
 <# For SQL Server Mode
 .\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseMode' -value 'SQLServer'
-.\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseServer' -value 'HBS-JBALDWIN01'
-.\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseName' -value 'Migration'
+.\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseServer' -value 'localhost'
+.\pre_migration_master.ps1 -mode 'SetConfig' -key 'DatabaseName' -value 'FileScan'
 .\pre_migration_master.ps1 -mode 'CreateDatabase' 
 #>
 

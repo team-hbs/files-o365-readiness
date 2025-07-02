@@ -247,9 +247,11 @@ function CollectDocumentLinks2($ownerId)
                         if ($url -ne $null -AND $url.Trim() -ne '')
                         {
                             write-host 'LINK:' $url -f Cyan
+                            <#
                             $query = "INSERT INTO ScanLink (Url,OwnerId,FileId,Created) VALUES ('$url',$ownerId,$fileId,'$created')"
                             write-host $query
                             SqlQueryInsert -query $query
+                            #>
                         }
                     }
                 }

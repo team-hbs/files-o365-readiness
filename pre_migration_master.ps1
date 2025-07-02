@@ -940,6 +940,7 @@ elseif ($mode -eq 'Import')
 	{
 			try
 			{
+
 				$sourceBatchNumber = $source.BatchNumber
 				$adHomeDirectory = $source.SourceDirectory.Trim().ToLower()
 

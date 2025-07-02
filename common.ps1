@@ -338,3 +338,36 @@ if ((GetConfig 'DatabaseMode') -eq 'SQLServer')
 	$global:SqlConnection.ConnectionString = $connectionString
 	$global:SqlServer = $true
 }
+
+
+function GetSources($wave, $batchnumber, $ownerId)
+{
+    $sources = @()
+    $null = @(
+        if ($wave -ne '')
+        {
+            $SqlQuery = "SELECT * FROM Source WHERE Wave = '$wave'"
+            $batches = SqlQueryReturn($SqlQuery)
+            write-host $SqlQuery -ForegroundColor Green
+            $sources = SqlQueryReturn($SqlQuery)
+        }
+        elseif ($ownerId -ne -1)
+        {
+            $SqlQuery = "SELECT * FROM Source Where Id = $ownerId"
+            write-host $SqlQuery -ForegroundColor Green
+            $sources = SqlQueryReturn($SqlQuery)
+        }
+        elseif($batchNumber -ne -1)
+        {
+            #get all sources with that batch number        
+            $SqlQuery = "SELECT *
+            FROM Source
+	        WHERE BatchNumber = $batchNumber 
+            "
+            write-host $SqlQuery -ForegroundColor Green
+            $sources = SqlQueryReturn($SqlQuery)
+        }
+       
+    )
+    return $sources
+}
