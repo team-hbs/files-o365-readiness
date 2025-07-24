@@ -21,8 +21,10 @@ foreach($source in $sources)
 	$overall = Get-ChildItem $path -recurse | Measure-Object -property length -sum
 	$overallFileSize = $overall.Sum / 1000000000
 	$overallFileCount = $overall.Count
-	
+	$ownerId = $source.Id
 	$query = "UPDATE Source SET FileCount = " + $overallFileCount + ", FileSize = " + $overallFileSize + " WHERE Id = " + $ownerId
+    write-host $query -f Yellow
+
     SqlQueryInsert -query $query
 	
 }
