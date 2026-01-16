@@ -323,8 +323,7 @@ $query = "
             [Id] [int] IDENTITY(1,1) NOT NULL,
             [OwnerId] [int] NULL,
             [FileId] [int] NULL,
-            [Url] [nvarchar](max) NULL,
-            NULL
+            [Url] [nvarchar](max) NULL
         ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
     END
 "
@@ -343,8 +342,7 @@ $query = "
             [OwnerId] [int] NULL,
             [FileId] [int] NULL,
             [Match] [nvarchar](max) NULL,
-            [PatternName] [nvarchar](max) NULL,
-            NULL
+            [PatternName] [nvarchar](max) NULL
         ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
     END
 "
