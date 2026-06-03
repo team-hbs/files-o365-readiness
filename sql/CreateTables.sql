@@ -124,6 +124,7 @@ CREATE TABLE [dbo].[ScanFile](
 GO
 
 CREATE TABLE [dbo].[ScanJob](
+	[Id] [int] IDENTITY(1,1) NOT NULL,
 	[OwnerId] [int] NULL,
 	[Email] [nvarchar](max) NULL,
 	[FileCountDisk] [int] NULL,
